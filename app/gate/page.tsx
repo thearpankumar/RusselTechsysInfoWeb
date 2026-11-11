@@ -5,6 +5,7 @@ import { safeNext } from "@/lib/gate";
 import { GateForm } from "./GateForm";
 import { Globe } from "@/components/chapters/intro/Globe";
 import { getLandMask } from "@/components/chapters/intro/landMask";
+import { TalenciaMark } from "@/components/journey/TalenciaMark";
 
 export const metadata: Metadata = { title: "Welcome" };
 
@@ -20,9 +21,17 @@ export default async function GatePage({ searchParams }: { searchParams: Promise
       <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden lg:justify-end">
         <Globe mask={mask} settle="auto" dim surface="canvas" className="w-full max-w-2xl opacity-25 sm:opacity-40 lg:w-3/5 lg:max-w-none lg:translate-x-1/4 lg:opacity-70" />
       </div>
-      <header className="relative flex items-center justify-between px-6 pt-8 sm:px-12 lg:px-16">
-        <span className="t-mono-sm text-muted">Talencia Global</span>
-        <span className="t-mono-sm text-muted">Confidential · Nov 2026</span>
+      <header className="relative isolate flex items-start justify-between px-6 pt-8 sm:px-12 lg:px-16">
+        {/* Talencia Global mark as a hairline watermark, cropped by the page's top-left corner (same treatment as the rail). */}
+        <TalenciaMark variant="outline" className="pointer-events-none absolute -top-10 -left-8 -z-10 h-48 text-chart-mid opacity-25 sm:h-56" />
+        <div className="flex flex-col gap-3">
+          <span className="flex items-center gap-3">
+            <TalenciaMark variant="brand" title="Talencia Global" className="h-9 w-auto shrink-0" />
+            <span className="t-label-md whitespace-nowrap text-on-surface">Talencia Global</span>
+          </span>
+          <span className="t-mono-sm whitespace-nowrap text-muted">for Rossell Techsys</span>
+        </div>
+        <span className="hidden pt-2 t-mono-sm text-muted sm:inline">Confidential · Nov 2026</span>
       </header>
       <section className="relative flex flex-1 flex-col justify-center px-6 py-16 sm:px-12 lg:px-16">
         <div className="max-w-5xl">
