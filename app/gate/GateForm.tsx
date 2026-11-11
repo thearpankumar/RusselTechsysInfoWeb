@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { LockKeyhole } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui-rt/Button";
 import { Kbd } from "@/components/ui-rt/Kbd";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ export function GateForm({ next, initialError = false }: { next: string; initial
   const [value, setValue] = React.useState("");
   const [state, setState] = React.useState<"idle" | "busy" | "error">(initialError ? "error" : "idle");
   const [message, setMessage] = React.useState(initialError ? "That passcode did not match." : "");
+  const [reveal, setReveal] = React.useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +49,7 @@ export function GateForm({ next, initialError = false }: { next: string; initial
         <LockKeyhole className="size-5 shrink-0 text-muted" strokeWidth={1.5} />
         <span className="sr-only">Passcode</span>
         <input
-          type="password"
+          type={reveal ? "text" : "password"}
           name="passcode"
           autoComplete="current-password"
           autoFocus
@@ -62,6 +63,15 @@ export function GateForm({ next, initialError = false }: { next: string; initial
           aria-describedby="gate-message"
           className="h-full min-w-0 flex-1 bg-transparent t-body-lg text-on-surface outline-none focus-visible:outline-none"
         />
+        <button
+          type="button"
+          onClick={() => setReveal((v) => !v)}
+          aria-label={reveal ? "Hide passcode" : "Show passcode"}
+          aria-pressed={reveal}
+          className="-mr-1 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-colors duration-150 ease-out hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          {reveal ? <EyeOff className="size-5" strokeWidth={1.5} aria-hidden /> : <Eye className="size-5" strokeWidth={1.5} aria-hidden />}
+        </button>
         <Kbd>↵</Kbd>
       </label>
       <Button type="submit" variant="primary" arrow disabled={state === "busy"} className="h-14">
