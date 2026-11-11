@@ -14,8 +14,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useJourney } from "./JourneyProvider";
 
-/** Rail width — main content must offset by the same amount on desktop (see JourneyMain: lg:pl-72 / lg:pl-18). */
-export const RAIL_WIDTH_CLASS = "lg:w-72";
+/** Rail width — main content must offset by the same amount on desktop (see JourneyMain: lg:pl-64 / lg:pl-18). */
+export const RAIL_WIDTH_CLASS = "lg:w-64";
 export const RAIL_COLLAPSED_CLASS = "lg:w-18";
 
 const focusRing = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
@@ -156,24 +156,24 @@ function NavList({ onNavigate, compact }: { onNavigate?: () => void; compact?: b
 
   const row = (on: boolean) =>
     cn(
-      "relative flex items-center gap-4 rounded-lg px-4 transition-colors duration-150 ease-out",
+      "relative flex items-center gap-3 rounded-lg px-3 transition-colors duration-150 ease-out",
       focusRing,
-      compact ? "h-12 t-body-md" : "h-12 t-body-lg",
+      compact ? "h-11 t-body-md" : "h-10 t-nav",
       on ? "bg-surface-raised text-on-surface" : "text-body hover:bg-background hover:text-on-surface"
     );
   const bar = <span aria-hidden className="absolute top-1/2 left-0 h-6 w-0.5 -translate-y-1/2 rounded-full bg-primary" />;
 
   return (
-    <div ref={listRef} className="flex flex-col gap-6">
+    <div ref={listRef} className="flex flex-col gap-5">
       <Link href="/" onClick={onNavigate} aria-current={active === null ? "page" : undefined} className={row(active === null)}>
         {active === null && bar}
-        <LayoutGrid className="size-5 text-muted" strokeWidth={1.5} aria-hidden />
+        <LayoutGrid className="size-4.5 text-muted" strokeWidth={1.5} aria-hidden />
         Journey map
       </Link>
       {acts.map((act) => (
         <div key={act.id}>
-          <p className="px-4 pb-2 t-label-caps text-muted">{act.label}</p>
-          <ol className="flex flex-col gap-1">
+          <p className="px-3 pb-2 t-label-caps text-muted">{act.label}</p>
+          <ol className="flex flex-col gap-0.5">
             {chapters
               .filter((c) => c.act === act.id)
               .map((c) => {
@@ -190,7 +190,7 @@ function NavList({ onNavigate, compact }: { onNavigate?: () => void; compact?: b
                       {isActive && bar}
                       {(() => {
                         const Icon = chapterIcon(c.id);
-                        return <Icon className={cn("size-5 shrink-0", isActive ? "text-on-surface" : "text-muted")} strokeWidth={1.5} aria-hidden />;
+                        return <Icon className={cn("size-4.5 shrink-0", isActive ? "text-on-surface" : "text-muted")} strokeWidth={1.5} aria-hidden />;
                       })()}
                       <span className="truncate" title={c.label}>
                         {"rail" in c ? c.rail : c.label}
@@ -207,7 +207,7 @@ function NavList({ onNavigate, compact }: { onNavigate?: () => void; compact?: b
                                 onClick={onNavigate}
                                 aria-current={on ? "page" : undefined}
                                 className={cn(
-                                  "flex h-9 items-center gap-3 rounded-md px-3 t-body-sm transition-colors duration-150 ease-out",
+                                  "flex h-8 items-center gap-3 rounded-md px-3 t-nav-sm transition-colors duration-150 ease-out",
                                   focusRing,
                                   on ? "bg-surface-raised text-on-surface" : "text-muted hover:text-on-surface"
                                 )}
@@ -307,7 +307,7 @@ export function ChapterRail() {
                 type="button"
                 onClick={openSearch}
                 className={cn(
-                  "flex h-12 w-full cursor-pointer items-center gap-3 rounded-lg border border-border px-4 t-body-md text-muted transition-colors duration-150 hover:border-chart-past hover:text-body",
+                  "flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg border border-border px-3 t-nav text-muted transition-colors duration-150 hover:border-chart-past hover:text-body",
                   focusRing
                 )}
               >

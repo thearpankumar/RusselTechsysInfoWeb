@@ -12,7 +12,7 @@ export function JourneyMain({ children }: { children: React.ReactNode }) {
       id="main"
       className={cn(
         "pt-16 transition-[padding] duration-200 ease-out motion-reduce:transition-none lg:pt-0 print:pt-0 print:pl-0",
-        presenting ? "lg:pl-0" : railCollapsed ? "lg:pl-18" : "lg:pl-72"
+        presenting ? "lg:pl-0" : railCollapsed ? "lg:pl-18" : "lg:pl-64"
       )}
     >
       {children}
