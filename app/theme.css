@@ -1,0 +1,309 @@
+/*
+ * Rossell Techsys journey — design tokens.
+ * Source of truth: DesignStyle/DESIGN.md ("Silo Gateway of Intelligence").
+ *
+ * RULE: raw colour values live ONLY in this file. Components reference the
+ * Tailwind utilities generated below (bg-surface, text-muted, border-border,
+ * fill-chart-past, bg-data-sage …) or the CSS variables (var(--color-primary)).
+ *
+ * Imported by app/globals.css after `@import "tailwindcss"`.
+ */
+
+@theme {
+  /* Wipe Tailwind's default palette: only DESIGN.md colours exist. */
+  --color-*: initial;
+
+  /* Neutrals — surfaces, darkest to lightest */
+  --color-canvas: #121111;
+  --color-background: #191818;
+  --color-surface: #20201f;
+  --color-surface-raised: #282727;
+  --color-border: #393938;
+
+  /* Text */
+  --color-on-surface: #fefdf8;
+  --color-body: #c5c4c1;
+  --color-muted: #9fa6ae;
+
+  /* Emphasis (inverse warm white) */
+  --color-primary: #fefdf8;
+  --color-on-primary: #191818;
+
+  /* Chart neutrals */
+  --color-chart-past: #595857;
+  --color-chart-mid: #9f9e98;
+  --color-chart-light: #c3c3bd;
+
+  /* Categorical data palette — DATA ENCODING ONLY (dots, marks, 1px lines,
+     3px accent stripes, ~25% badge tints). Never chrome, text or buttons.
+     Assign in this order: sage, slate, tan, lavender, olive, teal, rose, moss. */
+  --color-data-sage: #96ad95;
+  --color-data-slate: #95a2bf;
+  --color-data-tan: #bc9f7e;
+  --color-data-lavender: #ab9bb9;
+  --color-data-olive: #c0b684;
+  --color-data-teal: #8badaa;
+  --color-data-rose: #b79298;
+  --color-data-moss: #a4a97e;
+  /* Presenter brand (Talencia Global "tg" mark) — used only for the logo itself, never for UI or data. */
+  --color-brand-tg-t: #dc6803;
+  --color-brand-tg-g: #ffc000;
+
+  /* Scrim base for overlays/backdrops (warm near-black, used with /opacity) */
+  --color-scrim: #121111;
+
+  /* shadcn compatibility aliases (so future `shadcn add` output stays on-token) */
+  --color-foreground: #fefdf8;
+  --color-popover: #191818;
+  --color-popover-foreground: #fefdf8;
+  --color-ring: #fefdf8;
+  --color-input: #393938;
+  --color-accent: #282727;
+  --color-accent-foreground: #fefdf8;
+  --color-muted-foreground: #9fa6ae;
+
+  /* Radii */
+  --radius-*: initial;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 28px;
+
+  /* Shadows are forbidden by DESIGN.md */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+
+  /* Fonts (next/font variables are set on <html> in app/layout.tsx) */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Motion: 150–200ms ease-out only */
+  --ease-rt: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: 180ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Spacing scale (reference; Tailwind's 4px spacing already maps:
+     1=4 2=8 3=12 4=16 6=24 8=32 12=48 16=64 — use only these steps,
+     plus 10 (40px card padding), 5 (20px button padding), 1.5 (6px track
+     padding) which DESIGN.md components specify). */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+
+  /* Ordered categorical palette for programmatic use: var(--data-1) … */
+  --data-1: var(--color-data-sage);
+  --data-2: var(--color-data-slate);
+  --data-3: var(--color-data-tan);
+  --data-4: var(--color-data-lavender);
+  --data-5: var(--color-data-olive);
+  --data-6: var(--color-data-teal);
+  --data-7: var(--color-data-rose);
+  --data-8: var(--color-data-moss);
+}
+
+/* ---------- Typography scale (DESIGN.md typography tokens) ---------- */
+
+@utility t-headline-display {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+@utility t-headline-xl {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+@utility t-metric-xl {
+  font-family: var(--font-display);
+  font-size: clamp(3.5rem, 8vw, 6rem);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+}
+@utility t-metric-lg {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 4vw, 3.25rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+}
+@utility t-headline-lg {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.5vw, 2.5rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+@utility t-headline-md {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+@utility t-body-lg {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+@utility t-body-md {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+@utility t-body-sm {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+@utility t-label-md {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+@utility t-label-caps {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+@utility t-mono-sm {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+}
+
+/* Tabular figures helper for numbers in rows/tables */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Dot-grid canvas for graphs & flows */
+@utility dot-grid {
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-chart-past) 60%, transparent) 1px,
+    transparent 1.5px
+  );
+  background-size: 24px 24px;
+}
+
+/* Hatched fill = "at risk" status marker */
+@utility hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-chart-mid) 0 1.5px,
+    transparent 1.5px 4px
+  );
+}
+
+/* ---------- Base ---------- */
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  html {
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+    font-family: var(--font-sans);
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
+  /* Focus-visible: 2px primary outline, 2px offset */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-muted);
+  }
+
+  /* DESIGN.md icons: thin lucide line icons, 1.5px stroke, inheriting text colour.
+     Lucide renders stroke-width="2" by default; this makes 1.5 the site-wide default
+     (utilities such as stroke-[1] still win, being in a later layer). */
+  svg.lucide {
+    stroke-width: 1.5;
+    stroke: currentColor;
+    fill: none;
+  }
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* Reduced motion: kill transitions/animations site-wide */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

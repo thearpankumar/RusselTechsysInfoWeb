@@ -1,0 +1,26 @@
+// Barrel for the design-system primitives (DESIGN.md). Import from "@/components/ui-rt".
+export { Card } from "./Card";
+export { CardNested } from "./CardNested";
+export { Eyebrow } from "./Eyebrow";
+export { Stat } from "./Stat";
+export { StatRow } from "./StatRow";
+export { Chip, ChipCount } from "./Chip";
+export { Kbd, CountBadge } from "./Kbd";
+export { Cite } from "./Cite";
+export { SourcePopover } from "./SourcePopover";
+export { ConfidenceTag, CONFIDENCE_LABEL } from "./ConfidenceTag";
+export { Button, buttonClasses } from "./Button";
+export { IconButton } from "./IconButton";
+export { TabTrack } from "./TabTrack";
+export { BarChart, type BarDatum } from "./BarChart";
+export { HBar } from "./HBar";
+export { HeatCell, heatLevel, type HeatLevel } from "./HeatCell";
+export { SegmentBar, type Segment } from "./SegmentBar";
+export { StatusTrack, type TrackStep } from "./StatusTrack";
+export { Legend, type LegendItem } from "./Legend";
+export { Marker, type MarkerTone, type MarkerShape } from "./Marker";
+export { KeyValueRows, type KeyValueRow } from "./KeyValueRows";
+export { DetailOverlay } from "./DetailOverlay";
+export { ChartFrame } from "./ChartFrame";
+export { Reveal } from "./Reveal";
+export { PhotoCard, PhotoStrip, type PhotoCardProps, type PhotoStripProps } from "./PhotoCard";
