@@ -198,7 +198,7 @@ Rules that the code follows:
 |---|---|
 | `←` / `→` | Previous or next section, crossing chapter boundaries |
 | `/` or `⌘K` / `Ctrl+K` | Open search |
-| `M` or `Esc` | Back to the journey map |
+| `Esc` | Leave presenter mode, otherwise back to the start |
 | `[` | Collapse or expand the chapter rail |
 | `P` | Presenter mode on or off |
 | `Home` / `End` | First or last section |

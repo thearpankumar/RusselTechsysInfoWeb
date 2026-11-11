@@ -114,13 +114,10 @@ export function JourneyProvider({ children }: { children: React.ReactNode }) {
     }
     if (pathname !== "/") router.push("/");
   }, [presenting, pathname, router]);
-  const onMap = React.useCallback(() => {
-    if (pathname !== "/") router.push("/");
-  }, [pathname, router]);
   const openSearch = React.useCallback(() => setSearchOpen(true), []);
   const onFirst = React.useCallback(() => router.push(sequence[0].href), [router]);
   const onLast = React.useCallback(() => router.push(sequence[sequence.length - 1].href), [router]);
-  useKeyboardNav({ onPrev, onNext, onSearch: openSearch, onToggleRail: toggleRail, onTogglePresent: togglePresent, onEscape: toMap, onMap, onFirst, onLast });
+  useKeyboardNav({ onPrev, onNext, onSearch: openSearch, onToggleRail: toggleRail, onTogglePresent: togglePresent, onEscape: toMap, onFirst, onLast });
 
   // Warm the neighbours so ←/→ feel instant.
   React.useEffect(() => {

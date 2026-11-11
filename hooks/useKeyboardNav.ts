@@ -18,8 +18,6 @@ export interface KeyboardNavHandlers {
   onTogglePresent?: () => void;
   /** Esc (no dialog open): leave presenter mode, else back to the map. */
   onEscape?: () => void;
-  /** "m" — back to the map (hub). */
-  onMap?: () => void;
   /** Home / End — first / last chapter. */
   onFirst?: () => void;
   onLast?: () => void;
@@ -27,9 +25,9 @@ export interface KeyboardNavHandlers {
 
 /**
  * Global keys: ←/→ = previous/next chapter, "/" or ⌘K / Ctrl+K = search, "[" = collapse rail, "p" = presenter mode,
- * Esc / "m" = back to the map, Home/End = first/last section. Ignored while typing or when a dialog is open.
+ * Esc = leave presenter mode, else back to the start, Home/End = first/last section. Ignored while typing or when a dialog is open.
  */
-export function useKeyboardNav({ onPrev, onNext, onSearch, onToggleRail, onTogglePresent, onEscape, onMap, onFirst, onLast }: KeyboardNavHandlers) {
+export function useKeyboardNav({ onPrev, onNext, onSearch, onToggleRail, onTogglePresent, onEscape, onFirst, onLast }: KeyboardNavHandlers) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -69,13 +67,6 @@ export function useKeyboardNav({ onPrev, onNext, onSearch, onToggleRail, onToggl
         case "Escape":
           onEscape?.();
           break;
-        case "m":
-        case "M":
-          if (onMap) {
-            e.preventDefault();
-            onMap();
-          }
-          break;
         case "Home":
           if (onFirst) {
             e.preventDefault();
@@ -92,5 +83,5 @@ export function useKeyboardNav({ onPrev, onNext, onSearch, onToggleRail, onToggl
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onPrev, onNext, onSearch, onToggleRail, onTogglePresent, onEscape, onMap, onFirst, onLast]);
+  }, [onPrev, onNext, onSearch, onToggleRail, onTogglePresent, onEscape, onFirst, onLast]);
 }

@@ -146,7 +146,6 @@ function SectionFooter({ chapter, active }: { chapter: ChapterId; active: string
         <Link href="/" className={cn("inline-flex items-center gap-2 rounded-full hover:text-on-surface", focusRing)}>
           <LayoutGrid className="size-4" strokeWidth={1.5} aria-hidden />
           Back to the map
-          <Kbd>M</Kbd>
         </Link>
         <span className="hidden items-center gap-2 sm:inline-flex">
           <Kbd keys={["←", "→"]} /> previous / next section

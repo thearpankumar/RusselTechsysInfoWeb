@@ -332,9 +332,6 @@ export function ChapterRail() {
                 <button type="button" onClick={togglePresent} className={cn("inline-flex cursor-pointer items-center gap-2 rounded-sm hover:text-body", focusRing)}>
                   <Kbd>P</Kbd> present
                 </button>
-                <span className="inline-flex items-center gap-2">
-                  <Kbd>M</Kbd> map
-                </span>
                 <span className="-my-2 ml-auto -mr-2">
                   <SignOutButton compact />
                 </span>
