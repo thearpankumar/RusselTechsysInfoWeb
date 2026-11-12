@@ -84,7 +84,7 @@ function DoorCard({ href, kicker, title, sub, dir }: { href: string; kicker: str
     <Link
       href={href}
       className={cn(
-        "group flex min-h-32 flex-col justify-between gap-4 rounded-xl border border-border bg-surface p-6 transition-colors duration-150 ease-out hover:border-chart-past hover:bg-surface-raised sm:p-8",
+        "group flex h-full min-h-32 flex-col justify-between gap-4 rounded-xl border border-border bg-surface p-6 transition-colors duration-150 ease-out hover:border-chart-past hover:bg-surface-raised sm:p-8",
         focusRing,
         dir === "next" && "sm:items-end sm:text-right"
       )}
@@ -102,7 +102,10 @@ function DoorCard({ href, kicker, title, sub, dir }: { href: string; kicker: str
   );
 }
 
-/** Previous / next section (crossing into neighbouring chapters), the takeaway on the last section, and "Back to the map". */
+/**
+ * Previous / next section (crossing into neighbouring chapters), the takeaway on the last section, and "Back to the map".
+ * Both doors carry only names (no descriptions) and fill their grid cells, so they are always the same size.
+ */
 function SectionFooter({ chapter, active }: { chapter: ChapterId; active: string }) {
   const secs = sectionsOf(chapter);
   const ci = chapters.findIndex((c) => c.id === chapter);
@@ -124,12 +127,14 @@ function SectionFooter({ chapter, active }: { chapter: ChapterId; active: string
   let next: React.ReactNode;
   if (!isLast) {
     const s = secs[si + 1];
-    next = <DoorCard dir="next" href={sectionHref(chapter, s.id)} kicker="Next section" title={s.label} sub={s.purpose || undefined} />;
+    next = <DoorCard dir="next" href={sectionHref(chapter, s.id)} kicker="Next section" title={s.label} />;
   } else if (ci < chapters.length - 1) {
     const nc = chapters[ci + 1];
-    next = <DoorCard dir="next" href={sectionHref(nc.id, sectionsOf(nc.id)[0].id)} kicker="Next chapter" title={nc.label} sub={nc.teaser} />;
+    const first = sectionsOf(nc.id)[0];
+    // Mirrors "Previous chapter": the chapter, then the section it opens on (no teaser, so both doors match).
+    next = <DoorCard dir="next" href={sectionHref(nc.id, first.id)} kicker="Next chapter" title={nc.label} sub={first.label} />;
   } else {
-    next = <DoorCard dir="next" href="/" kicker="End of the journey" title="Back to the map" sub="Every chapter, at a glance." />;
+    next = <DoorCard dir="next" href="/" kicker="End of the journey" title="Back to the map" />;
   }
 
   return (
