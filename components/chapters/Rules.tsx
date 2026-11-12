@@ -19,6 +19,7 @@ import { RuleQuestions } from "./rules/RuleQuestions";
 import { RulesCards } from "./rules/RulesCards";
 import { RulesChanges } from "./rules/RulesChanges";
 import { RulesCoverage } from "./rules/RulesCoverage";
+import { RulesHeaderStats } from "./rules/RulesHeaderStats";
 import { RulesOverview } from "./rules/RulesOverview";
 import { RulesTable } from "./rules/RulesTable";
 import { RulesTimeline } from "./rules/RulesTimeline";
@@ -148,6 +149,8 @@ export default function Rules() {
     <ChapterShell
       id="rules"
       statement="Every rule in one register: what applies, to what, and since when."
+      // Key figures fill the header's right side on every tab except "At a glance", whose content leads with them.
+      aside={section && section !== "overview" ? <RulesHeaderStats rules={rules} asOf={asOf} onPreset={preset} /> : undefined}
       lead={`${ruleRegister.length} rules from the business-rules specification and the working sessions, each with its state history, status, active period and context. Search, filter and sort them; read them as a table, cards or a timeline; compare two dates; download the lot as Excel.`}
     >
       {/* Four sub-tabs (lib/structure/rules.ts), same order as before; the shell header names each one. */}

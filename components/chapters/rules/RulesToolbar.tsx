@@ -1,10 +1,13 @@
 "use client";
 
-// Register toolbar: search; one row of facet pills (each shows its own values and clears itself); as-of and compare
-// dates; sort; view switch; download (Excel workbook of every rule, or CSV of the rows shown).
+// Register toolbar, two compact rows (fits a 14" laptop without pushing the table down):
+//   1. search · result count · dates (as-of + compare, one popover) · sort · view switch · download
+//   2. filters: facet pills (each shows and clears its own values), flags, "Clear all"
+// Patterns: Carbon data-table toolbar (few actions, row-height controls), Genesys Spark table filtering (compact
+// search, filters as a row of dropdowns), PatternFly toolbar (search, filter, sort and view grouped above the data).
 import * as React from "react";
 import { Popover as PopoverPrimitive } from "radix-ui";
-import { ArrowDown, ArrowUp, ChartGantt, Check, ChevronDown, Download, FileSpreadsheet, FileText, LayoutGrid, Pencil, Plus, RotateCcw, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, ChartGantt, Check, ChevronDown, Download, FileSpreadsheet, FileText, LayoutGrid, Pencil, Plus, RotateCcw, Rows3, Search, X } from "lucide-react";
 import type { RuleContext, RuleRecord } from "@/content/types-extra";
 import { RULE_CONTEXTS } from "@/content/rules";
 import { Button, Kbd, Marker, TabTrack } from "@/components/ui-rt";
@@ -19,6 +22,7 @@ import {
   facetCounts,
   flagCount,
   formatDate,
+  formatShort,
   hasFilters,
   rulesToCsv,
   saveBlob,
@@ -29,7 +33,7 @@ import {
   type RuleView,
 } from "@/lib/rules";
 import { cn } from "@/lib/utils";
-import { FacetPill, type FacetPillOption } from "./FacetPill";
+import { FacetPill, MoreFacets, type FacetPillOption } from "./FacetPill";
 import { DateField, StateMarker } from "./shared";
 import type { RulesState } from "./useRulesState";
 
@@ -46,6 +50,11 @@ function facetMarker(facet: FacetKey, value: string): React.ReactNode {
 }
 
 const pill = "inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-3 t-body-md transition-colors duration-150";
+
+/** Facets that fold into "More" on laptop widths (the least used). */
+const FOLDED: FacetKey[] = ["str", "origin", "owner"];
+/** Below this width the view switch, sort and download show icons only (names stay for screen readers). */
+const WIDE = "sr-only min-[1680px]:not-sr-only";
 
 export function RulesToolbar({
   state,
@@ -109,46 +118,85 @@ export function RulesToolbar({
   };
 
   return (
-    <div className="flex flex-col gap-4 print:hidden">
-      <label className="flex h-14 items-center gap-3 rounded-lg border border-border px-4 transition-colors duration-150 focus-within:border-chart-past">
-        <Search aria-hidden className="size-5 shrink-0 text-muted" strokeWidth={1.5} />
-        <input
-          ref={searchRef}
-          type="search"
-          value={query.q}
-          onChange={(e) => setQuery({ q: e.target.value })}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              if (query.q) setQuery({ q: "" });
-              else searchRef.current?.blur();
-            } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") e.stopPropagation();
-          }}
-          placeholder={`Search ${rules.length} rules: ids, wording, contexts, entities…`}
-          aria-label="Search the business rules"
-          className="h-full min-w-0 flex-1 bg-transparent t-body-lg text-on-surface outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
-        />
-        {query.q ? (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => {
-              setQuery({ q: "" });
-              searchRef.current?.focus();
+    <div className="flex flex-col gap-3 print:hidden">
+      {/* Row 1: search · count · dates · sort · view · download */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex h-10 min-w-44 flex-1 basis-48 items-center gap-2 rounded-lg border border-border px-3 transition-colors duration-150 hover:border-chart-past focus-within:border-chart-past">
+          <Search aria-hidden className="size-4 shrink-0 text-muted" strokeWidth={1.5} />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query.q}
+            onChange={(e) => setQuery({ q: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                if (query.q) setQuery({ q: "" });
+                else searchRef.current?.blur();
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") e.stopPropagation();
             }}
-            className="cursor-pointer text-muted hover:text-on-surface"
-          >
-            <X className="size-5" strokeWidth={1.5} />
-          </button>
-        ) : (
-          <Kbd className="hidden sm:inline-flex">f</Kbd>
-        )}
-      </label>
+            placeholder="Search rules…"
+            aria-label="Search the business rules"
+            className="h-full min-w-0 flex-1 bg-transparent t-body-md text-on-surface outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
+          />
+          {query.q ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => {
+                setQuery({ q: "" });
+                searchRef.current?.focus();
+              }}
+              className="cursor-pointer text-muted hover:text-on-surface"
+            >
+              <X className="size-4" strokeWidth={1.5} />
+            </button>
+          ) : (
+            <Kbd className="hidden h-6 min-w-6 sm:inline-flex">f</Kbd>
+          )}
+        </label>
+        <p role="status" aria-live="polite" className="px-2 t-body-md whitespace-nowrap text-body">
+          <span className="tnum text-on-surface">{list.length}</span> of <span className="tnum">{rules.length}</span> rules
+        </p>
+        <DatesMenu query={query} setQuery={setQuery} today={today} liveAsOf={liveAsOf} asOfInput={asOfInput} vsInput={vsInput} compareButton={compareButton} />
+        <SortMenu sort={query.sort} dir={query.dir} onChange={(sort, dir) => setQuery({ sort, dir })} />
+        <TabTrack<RuleView>
+          label="View"
+          size="sm"
+          value={view}
+          onChange={setView}
+          // Icons only on laptop widths (names stay for screen readers); names show from 1680px.
+          options={[
+            { value: "table", label: <span className={WIDE}>Table</span>, icon: <Rows3 aria-hidden /> },
+            { value: "cards", label: <span className={WIDE}>Cards</span>, icon: <LayoutGrid aria-hidden /> },
+            { value: "timeline", label: <span className={WIDE}>Timeline</span>, icon: <ChartGantt aria-hidden /> },
+          ]}
+        />
+        <DownloadMenu rules={rules} query={query} asOf={asOf} list={list} editCount={editCount} />
+      </div>
 
+      {/* Row 2: filters */}
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
         {FACETS.map((f) => (
-          <FacetPill key={f} label={FACET_LABEL[f]} options={options[f]} selected={query[f] as string[]} onChange={(values) => setQuery({ [f]: values } as Partial<RuleQuery>)} />
+          <FacetPill
+            key={f}
+            label={FACET_LABEL[f]}
+            options={options[f]}
+            selected={query[f] as string[]}
+            onChange={(values) => setQuery({ [f]: values } as Partial<RuleQuery>)}
+            className={FOLDED.includes(f) ? "hidden 2xl:inline-flex" : undefined}
+          />
         ))}
+        <MoreFacets
+          className="2xl:hidden"
+          facets={FOLDED.map((f) => ({
+            key: f,
+            label: FACET_LABEL[f],
+            options: options[f],
+            selected: query[f] as string[],
+            onChange: (values: string[]) => setQuery({ [f]: values } as Partial<RuleQuery>),
+          }))}
+        />
         <button
           type="button"
           aria-pressed={query.flag}
@@ -197,73 +245,6 @@ export function RulesToolbar({
             Changed since {formatDate(query.vs)} only
           </button>
         )}
-        {filtered && (
-          <Button variant="ghost" size="sm" onClick={clearAll}>
-            Clear all
-          </Button>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-border pt-4">
-        <p role="status" aria-live="polite" className="t-body-md text-body">
-          <span className="tnum text-on-surface">{list.length}</span> of <span className="tnum">{rules.length}</span> rules
-        </p>
-
-        {/* As of: status is computed for this day. The reset sits inside the pill, so nothing moves. */}
-        <span className={cn(pill, "pr-1 hover:border-chart-past has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-primary", query.asOf ? "border-chart-past bg-surface-raised" : "border-border")}>
-          <label htmlFor="rules-as-of" className="text-muted">
-            As of
-          </label>
-          <DateField id="rules-as-of" inputRef={asOfInput} value={liveAsOf} onChange={(d) => setQuery({ asOf: d === today ? null : d })} />
-          <button
-            type="button"
-            disabled={!query.asOf}
-            aria-label={`Back to today, ${formatDate(today)}`}
-            title="Back to today"
-            onClick={() => {
-              setQuery({ asOf: null });
-              asOfInput.current?.focus();
-            }}
-            className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-on-surface disabled:pointer-events-none disabled:opacity-0"
-          >
-            <RotateCcw className="size-4" strokeWidth={1.5} />
-          </button>
-        </span>
-
-        {/* Compare: state changes between another date and the as-of date. */}
-        {query.vs ? (
-          <span className={cn(pill, "border-chart-past bg-surface-raised pr-1 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-primary")}>
-            <label htmlFor="rules-vs" className="text-muted">
-              Compared with
-            </label>
-            <DateField id="rules-vs" inputRef={vsInput} value={query.vs} onChange={(d) => setQuery({ vs: d })} />
-            <button
-              type="button"
-              aria-label="Stop comparing"
-              onClick={() => {
-                setQuery({ vs: null, changed: false });
-                requestAnimationFrame(() => compareButton.current?.focus());
-              }}
-              className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-muted hover:bg-surface hover:text-on-surface"
-            >
-              <X className="size-4" strokeWidth={1.5} />
-            </button>
-          </span>
-        ) : (
-          <button
-            ref={compareButton}
-            type="button"
-            onClick={() => {
-              setQuery({ vs: addDays(liveAsOf, -42) });
-              requestAnimationFrame(() => vsInput.current?.focus());
-            }}
-            className={cn(pill, "cursor-pointer border-dashed border-border text-body hover:border-chart-past hover:bg-surface-raised")}
-          >
-            <Plus aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
-            Compare dates
-          </button>
-        )}
-
         {editCount > 0 && (
           <Button
             variant="ghost"
@@ -278,24 +259,139 @@ export function RulesToolbar({
             Discard {editCount} {editCount === 1 ? "edit" : "edits"}
           </Button>
         )}
-
-        <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
-          <SortMenu sort={query.sort} dir={query.dir} onChange={(sort, dir) => setQuery({ sort, dir })} />
-          <TabTrack<RuleView>
-            label="View"
-            size="sm"
-            value={view}
-            onChange={setView}
-            options={[
-              { value: "table", label: "Table", icon: <Rows3 aria-hidden /> },
-              { value: "cards", label: "Cards", icon: <LayoutGrid aria-hidden /> },
-              { value: "timeline", label: "Timeline", icon: <ChartGantt aria-hidden /> },
-            ]}
-          />
-          <DownloadMenu rules={rules} query={query} asOf={asOf} list={list} editCount={editCount} />
-        </div>
+        {filtered && (
+          <Button variant="ghost" size="sm" onClick={clearAll}>
+            Clear all
+          </Button>
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * One "Dates" control: the as-of date (status is computed for it) and an optional compare date, in a popover.
+ * The trigger reads "As of 12 Nov 2026", or "1 Oct → 12 Nov 2026" while comparing.
+ */
+function DatesMenu({
+  query,
+  setQuery,
+  today,
+  liveAsOf,
+  asOfInput,
+  vsInput,
+  compareButton,
+}: {
+  query: RuleQuery;
+  setQuery: RulesState["setQuery"];
+  today: string;
+  liveAsOf: string;
+  asOfInput: React.RefObject<HTMLInputElement | null>;
+  vsInput: React.RefObject<HTMLInputElement | null>;
+  compareButton: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const custom = !!(query.asOf || query.vs);
+  const [lo, hi] = query.vs ? (query.vs <= liveAsOf ? [query.vs, liveAsOf] : [liveAsOf, query.vs]) : [liveAsOf, liveAsOf];
+  const field = "inline-flex h-10 items-center rounded-full border border-border px-3 transition-colors duration-150 hover:border-chart-past has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-primary";
+  return (
+    <PopoverPrimitive.Root>
+      <PopoverPrimitive.Trigger asChild>
+        <button
+          type="button"
+          aria-label={query.vs ? `Dates: comparing ${formatDate(lo)} with ${formatDate(hi)}` : `Dates: status as of ${formatDate(liveAsOf)}`}
+          className={cn(
+            pill,
+            "cursor-pointer hover:border-chart-past hover:bg-surface-raised data-[state=open]:border-chart-past data-[state=open]:bg-surface-raised",
+            custom ? "border-chart-past bg-surface-raised text-on-surface" : "border-border text-on-surface"
+          )}
+        >
+          <CalendarDays aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
+          {query.vs ? (
+            <span className="tnum whitespace-nowrap">
+              {formatShort(lo)} → {formatDate(hi)}
+            </span>
+          ) : (
+            <span className="whitespace-nowrap">
+              <span className={cn("text-muted", WIDE)}>As of </span>
+              <span className="tnum">{formatDate(liveAsOf)}</span>
+            </span>
+          )}
+          <ChevronDown aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
+        </button>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="start"
+          sideOffset={8}
+          collisionPadding={16}
+          onKeyDown={(e) => e.stopPropagation()}
+          aria-label="Dates"
+          className="z-50 flex w-88 flex-col gap-4 rounded-lg border border-border bg-background p-4 text-on-surface duration-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
+        >
+          <div className="flex flex-col gap-2">
+            <label htmlFor="rules-as-of" className="t-label-caps text-muted">
+              Status as of
+            </label>
+            <div className="flex items-center gap-2">
+              <span className={field}>
+                <DateField id="rules-as-of" inputRef={asOfInput} value={liveAsOf} onChange={(d) => setQuery({ asOf: d === today ? null : d })} />
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!query.asOf}
+                aria-label={`Back to today, ${formatDate(today)}`}
+                icon={<RotateCcw aria-hidden />}
+                onClick={() => {
+                  setQuery({ asOf: null });
+                  asOfInput.current?.focus();
+                }}
+              >
+                Today
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <label htmlFor="rules-vs" className="t-label-caps text-muted">
+              Compare with
+            </label>
+            {query.vs ? (
+              <div className="flex items-center gap-2">
+                <span className={field}>
+                  <DateField id="rules-vs" inputRef={vsInput} value={query.vs} onChange={(d) => setQuery({ vs: d })} />
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Stop comparing"
+                  icon={<X aria-hidden />}
+                  onClick={() => {
+                    setQuery({ vs: null, changed: false });
+                    requestAnimationFrame(() => compareButton.current?.focus());
+                  }}
+                >
+                  Stop
+                </Button>
+              </div>
+            ) : (
+              <button
+                ref={compareButton}
+                type="button"
+                onClick={() => {
+                  setQuery({ vs: addDays(liveAsOf, -42) });
+                  requestAnimationFrame(() => vsInput.current?.focus());
+                }}
+                className={cn(pill, "w-fit cursor-pointer border-dashed border-border text-body hover:border-chart-past hover:bg-surface-raised")}
+              >
+                <Plus aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
+                Compare dates
+              </button>
+            )}
+            <p className="t-body-sm text-muted">Comparing shows what changed between the two dates: a summary, a change log and a shaded band on the timeline.</p>
+          </div>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 }
 
@@ -311,7 +407,7 @@ function SortMenu({ sort, dir, onChange }: { sort: RuleSortKey; dir: "asc" | "de
           aria-label={`Sort: ${SORT_LABEL[sort]}, ${dir === "asc" ? "ascending" : "descending"}`}
           className={cn(pill, "cursor-pointer border-border text-on-surface hover:border-chart-past hover:bg-surface-raised data-[state=open]:border-chart-past data-[state=open]:bg-surface-raised")}
         >
-          <span className="text-muted">Sort</span>
+          <span className={cn("text-muted", WIDE)}>Sort</span>
           {SORT_LABEL[sort]}
           <Arrow aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
           <ChevronDown aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
@@ -391,12 +487,13 @@ function DownloadMenu({ rules, query, asOf, list, editCount }: { rules: RuleReco
         <button
           type="button"
           // Start fetching the Excel code as soon as the menu is likely to be used.
+          title="Download"
           onPointerEnter={() => void loadExcel()}
           onFocus={() => void loadExcel()}
           className={cn(pill, "cursor-pointer border-border text-on-surface hover:border-primary hover:bg-primary hover:text-on-primary data-[state=open]:border-chart-past data-[state=open]:bg-surface-raised data-[state=open]:text-on-surface")}
         >
           <Download aria-hidden className="size-4" strokeWidth={1.5} />
-          Download
+          <span className={WIDE}>Download</span>
         </button>
       </PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>

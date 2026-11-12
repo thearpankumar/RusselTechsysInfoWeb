@@ -22,7 +22,7 @@ export const rulesSections: SectionDef[] = [
     label: "All rules",
     statement: "Every rule, with its status on any date you pick.",
     purpose:
-      "Each rule moves through dated states (draft, review, approved, active, replaced); its status is Active only while it is in force on the as-of date. Search (F), filter, sort, compare two dates, open a rule to edit its dates, or download it all as Excel.",
+      "A rule is Active while it is in force on the as-of date. Search, filter, compare two dates, open a rule to edit its dates, or download everything as Excel.",
     subsections: [{ id: "rules-register", label: "All rules" }],
   },
   {

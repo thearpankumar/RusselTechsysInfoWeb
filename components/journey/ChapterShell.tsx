@@ -19,6 +19,8 @@ export interface ChapterShellProps {
   eyebrow?: React.ReactNode;
   /** Lead paragraph under the statement, first section only. */
   lead?: React.ReactNode;
+  /** Optional content beside the header on wide screens (e.g. a few key figures), so the right side is not empty. */
+  aside?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
 }
@@ -160,7 +162,7 @@ function SectionFooter({ chapter, active }: { chapter: ChapterId; active: string
  * section tabs, in-section sub-section chips, the active <Section>, then prev/next doors. Header → figure → blocks
  * enter in sequence on every section mount.
  */
-export function ChapterShell({ id, statement, eyebrow, lead, className, children }: ChapterShellProps) {
+export function ChapterShell({ id, statement, eyebrow, lead, aside, className, children }: ChapterShellProps) {
   const chapter = getChapter(id);
   const act = getAct(chapter.act);
   const ctx = useActiveSection();
@@ -189,21 +191,28 @@ export function ChapterShell({ id, statement, eyebrow, lead, className, children
       aria-labelledby={`${id}-title`}
       className={cn("px-6 pt-12 pb-16 sm:px-12 lg:px-16 lg:pt-16", className)}
     >
-      <header className="max-w-4xl">
-        <motion.p {...head(0)} className="flex flex-wrap items-center gap-3 t-label-caps text-muted">
-          <span>{eyebrow ?? chapter.label}</span>
-          <span aria-hidden>·</span>
-          <span>{first ? act.label : sec.label}</span>
-        </motion.p>
-        <motion.h1 {...head(0.04)} id={`${id}-title`} className="mt-6 t-headline-lg text-on-surface">
-          {headline}
-        </motion.h1>
-        {sublead && (
-          <motion.p {...head(0.08)} className="mt-6 max-w-3xl t-body-lg text-body">
-            {sublead}
+      <div className={cn(aside && "flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between lg:gap-12")}>
+        <header className={cn("max-w-4xl", aside && "min-w-0 lg:flex-1")}>
+          <motion.p {...head(0)} className="flex flex-wrap items-center gap-3 t-label-caps text-muted">
+            <span>{eyebrow ?? chapter.label}</span>
+            <span aria-hidden>·</span>
+            <span>{first ? act.label : sec.label}</span>
           </motion.p>
+          <motion.h1 {...head(0.04)} id={`${id}-title`} className="mt-6 t-headline-lg text-on-surface">
+            {headline}
+          </motion.h1>
+          {sublead && (
+            <motion.p {...head(0.08)} className="mt-6 max-w-3xl t-body-lg text-body">
+              {sublead}
+            </motion.p>
+          )}
+        </header>
+        {aside && (
+          <motion.aside {...head(0.12)} className="lg:shrink-0 print:hidden">
+            {aside}
+          </motion.aside>
         )}
-      </header>
+      </div>
 
       <SectionTabs chapter={id} active={activeId} />
 
