@@ -120,7 +120,7 @@ export const internalSources: Source[] = [
   },
   {
     id: "RULES",
-    title: "Engineering and BOM — Business Rules (sections 2.1 BOM identity, 2.2 BOM revision management, Net Demand and Supply), internal draft",
+    title: "Engineering, BOM and Demand Processing — Business Rules & Logical Design (§1–§12: BOM identity, revisions, upload, consolidation, customer mapping, demand sources, forecast exclusion, consolidation, net demand, auditability), working design specification",
     publisher: "Project team",
     date: "7 Nov 2026",
     accessed: "7 Nov 2026",

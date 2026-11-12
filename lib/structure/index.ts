@@ -15,6 +15,7 @@ import { scaleSections } from "./scale";
 import { supplyBaseSections } from "./supply-base";
 import { operationsSections } from "./operations";
 import { dataSections } from "./data";
+import { rulesSections } from "./rules";
 import { sourcesSections } from "./sources";
 
 export type { SectionDef, SubsectionDef } from "./types";
@@ -33,6 +34,7 @@ export const structure: Record<ChapterId, SectionDef[]> = {
   "supply-base": supplyBaseSections,
   "operations": operationsSections,
   "data": dataSections,
+  "rules": rulesSections,
   "sources": sourcesSections,
 };
 

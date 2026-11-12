@@ -16,6 +16,7 @@ import { sources } from "@/content/sources";
 import { suppliers } from "@/content/suppliers";
 import { materials } from "@/content/materials";
 import { files } from "@/content/files";
+import { ruleRegister } from "@/content/rules";
 
 /** Hub figures that are counts of content: computed so they never drift from the chapters. */
 const LIVE_FIGURE: Record<string, string> = {
@@ -23,9 +24,10 @@ const LIVE_FIGURE: Record<string, string> = {
   "supply-base": String(suppliers.length),
   anatomy: String(materials.length),
   data: String(files.length),
+  rules: String(ruleRegister.length),
 };
 
-/** Non-linear journey map: five acts, fourteen chapter doors, each listing its sections. Visited doors are marked. */
+/** Non-linear journey map: five acts, fifteen chapter doors, each listing its sections. Visited doors are marked. */
 export function JourneyMap() {
   const [visited, setVisited] = React.useState<Set<string>>(() => new Set());
   const reduce = useReducedMotionSafe();
@@ -40,7 +42,7 @@ export function JourneyMap() {
         <div className="max-w-3xl">
           <p className="t-label-caps text-muted">The journey map</p>
           <h2 id="journey-map-title" className="mt-4 t-headline-lg text-on-surface">
-            Five acts, fourteen chapters. Start anywhere.
+            Five acts, fifteen chapters. Start anywhere.
           </h2>
           <p className="mt-4 t-body-lg text-body">Each door opens a chapter; each chapter is a few short sections. Use the arrow keys to walk through everything in order.</p>
         </div>

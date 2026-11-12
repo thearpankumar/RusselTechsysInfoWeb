@@ -13,7 +13,7 @@ A private, passcode-gated, editorial website that walks through Rossell Techsys'
 
 ## What it is
 
-Talencia Global built this site for its new client Rossell Techsys, a Bengaluru contract manufacturer of wire harnesses and electrical wiring interconnection systems (EWIS) for aerospace, defence, semiconductor equipment and space. It shows how well we understand the company and its domain before the engagement starts. The site reads like an annual report rendered as software. It has five acts and fourteen chapters, each split into short sections with their own routes. Every number carries its source ids and a confidence label, so a reader can tell a public filing from a working-session note or our own estimate. Access is behind a shared passcode, and no page is indexed by search engines.
+Talencia Global built this site for its new client Rossell Techsys, a Bengaluru contract manufacturer of wire harnesses and electrical wiring interconnection systems (EWIS) for aerospace, defence, semiconductor equipment and space. It shows how well we understand the company and its domain before the engagement starts. The site reads like an annual report rendered as software. It has five acts and fifteen chapters, each split into short sections with their own routes. Every number carries its source ids and a confidence label, so a reader can tell a public filing from a working-session note or our own estimate. Access is behind a shared passcode, and no page is indexed by search engines.
 
 ## Screenshots
 
@@ -38,12 +38,13 @@ Talencia Global built this site for its new client Rossell Techsys, a Bengaluru 
 
 ## Features
 
-- **Journey structure.** Act → Chapter → Section → Sub-section. Five acts hold fourteen chapters. Each chapter is a set of short sections, each on its own route (`/<chapter>/<section>`), with sticky section tabs, sub-section chips (`#anchor`) and previous and next doors. The last section of a chapter ends with "What this means", a plain-English takeaway.
+- **Journey structure.** Act → Chapter → Section → Sub-section. Five acts hold fifteen chapters. Each chapter is a set of short sections, each on its own route (`/<chapter>/<section>`), with sticky section tabs, sub-section chips (`#anchor`) and previous and next doors. The last section of a chapter ends with "What this means", a plain-English takeaway.
 - **Hub and journey map.** The home page opens on a title card with a 3D dotted globe and four headline figures, then the journey map: every act, every chapter door with its key figure and sections, and which doors you have already visited.
 - **3D moments.** The globe on the hub, and in chapter 09 an exploded wire harness that assembles as you scroll. You can drag it to rotate and select any of its twelve parts to see what it is and what it does. Both use three.js through `@react-three/fiber`. A static fallback is shown where WebGL is not available.
 - **Sourced facts with confidence labels.** Every figure shows citation chips (`S28 · R-scl-1`) that open the sources behind it. Anything other than a reported figure also carries a confidence tag (see [Content and sources model](#content-and-sources-model)).
 - **Search.** `/` or `⌘K` (`Ctrl+K`) opens a command palette across chapters, sections, clients, people, suppliers, facts and sources. A result on another page navigates there and opens the matching detail.
-- **Presenter mode.** `P` goes full screen, hides the rail and shows a slim `03 / 14 · 2/5` counter. Arrow keys step section by section.
+- **Presenter mode.** `P` goes full screen, hides the rail and shows a slim `03 / 15 · 2/5` counter. Arrow keys step section by section.
+- **Business-rules register.** `/rules/register` lists every business rule (spec and working sessions) with its status, active period, context, section, strength and owner. Search (`F`), filter with live counts, sort, switch between table, cards and timeline, and move the as-of date to see which rules were or will be in force. The whole view lives in the URL (`?ctx=supplier-order&status=active&rule=R3.3.7`), so it can be shared, and the shown rows export to CSV. Status periods, contexts and owners are sample data in `content/rules.ts` (`SAMPLE_PERIODS`) until Rossell confirms them.
 - **Fact sheet.** `/factsheet` is a one-page summary of the key figures with their sources, styled for print. Use "Print or save as PDF".
 - **Collapsible rail.** `[` collapses the desktop chapter rail to an icon strip and expands it again. The choice is remembered in `localStorage`.
 - **Passcode gate.** Every page redirects to `/gate` until the visitor enters the shared passcode. A signed cookie keeps them in for 30 days.
@@ -98,7 +99,7 @@ How the gate works: `proxy.ts` (Next 16's renamed middleware) redirects every pa
 |---|---|
 | `/` | Hub: title card with the globe, then the journey map |
 | `/<chapter>` | Redirects to the chapter's first section |
-| `/<chapter>/<section>` | One focused section view: header (`02.3 / 14`), section tabs, sub-section chips, the section, previous and next doors |
+| `/<chapter>/<section>` | One focused section view: header (`02.3 / 15`), section tabs, sub-section chips, the section, previous and next doors |
 | `/factsheet` | One-page printable fact sheet |
 | `/gate` | Passcode gate |
 | `/styleguide` | Design-system reference that renders every primitive |
@@ -110,8 +111,8 @@ Chapters, in order (`lib/journeyChapters.ts`):
 | 01 The company | 01 `portfolio` · 02 `financials` · 03 `growth` · 04 `footprint` · 05 `people` |
 | 02 The business | 06 `what-they-do` · 07 `clients` · 08 `competition` |
 | 03 What they make and buy | 09 `anatomy` (finished goods and materials) · 10 `scale` · 11 `supply-base` |
-| 04 How it runs | 12 `operations` · 13 `data` (files and data dictionary) |
-| 05 Sources | 14 `sources` |
+| 04 How it runs | 12 `operations` · 13 `data` (files and data dictionary) · 14 `rules` (business-rules register) |
+| 05 Sources | 15 `sources` |
 
 ## Project structure
 

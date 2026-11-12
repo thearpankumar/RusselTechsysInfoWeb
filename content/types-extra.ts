@@ -312,6 +312,55 @@ export interface BusinessRule extends Sourced {
   plain?: string;
 }
 
+/* ---------- business-rules register (chapter "rules") ---------- */
+
+/** What a rule applies to. Each context keeps one data colour everywhere (content/rules.ts). */
+export type RuleContext =
+  | "engineering-bom"
+  | "customer-submission"
+  | "customer-order"
+  | "customer-forecast"
+  | "supplier-order"
+  | "contractor"
+  | "inventory-allocation"
+  | "planning-run";
+
+/** Must / should / may, from the rule's wording. */
+export type RuleStrength = "must" | "should" | "may";
+
+/** Where the rule was agreed: the business-rules spec or the working sessions. */
+export type RuleOrigin = "spec" | "session";
+
+export interface RuleRecord extends Sourced {
+  /** Existing ids are kept (R2.1.1, RND.3, WS.A2); new spec rules are R<section>.<n>. */
+  id: string;
+  /** Document order (the "ID" sort). */
+  order: number;
+  /** Short name for cards and table rows. */
+  title: string;
+  /** The rule as written. */
+  text: string;
+  plain?: string;
+  /** RULE_SECTIONS id ("2.3", "WS-A"). */
+  section: string;
+  /** 1–3 contexts; the first is the primary one. SAMPLE until confirmed. */
+  contexts: RuleContext[];
+  strength: RuleStrength;
+  origin: RuleOrigin;
+  /** Owning team. SAMPLE until confirmed. */
+  owner: string;
+  /** ISO date the rule became active. SAMPLE until confirmed. */
+  activeFrom: string;
+  /** ISO date the rule stopped applying (exclusive); absent = open-ended. */
+  activeTo?: string;
+  /** Rule that replaced this one. */
+  supersededBy?: string;
+  /** Logical entities (spec §8 / §10) the rule touches. */
+  entities?: string[];
+  /** OpenQuestion ids this rule waits on ("Needs confirmation"). */
+  questions?: string[];
+}
+
 export interface SystemFact extends Sourced {
   id: string;
   system: string;

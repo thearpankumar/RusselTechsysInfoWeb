@@ -15,6 +15,7 @@ import { searchItems as scale } from "@/components/chapters/scale/search";
 import { searchItems as supply } from "@/components/chapters/supply/search";
 import { searchItems as operations } from "@/components/chapters/operations/search";
 import { searchItems as data } from "@/components/chapters/data/search";
+import { searchItems as rules } from "@/components/chapters/rules/search";
 import { searchItems as sources } from "@/components/chapters/sources/search";
 
 const byChapter: Record<ChapterId, SearchItem[]> = {
@@ -31,6 +32,7 @@ const byChapter: Record<ChapterId, SearchItem[]> = {
   "supply-base": supply,
   operations,
   data,
+  rules,
   sources,
 };
 

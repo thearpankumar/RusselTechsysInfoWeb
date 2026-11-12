@@ -11,6 +11,7 @@ import {
   Layers,
   LayoutGrid,
   PackageSearch,
+  ScrollText,
   Swords,
   TrendingUp,
   Users,
@@ -34,6 +35,7 @@ export const CHAPTER_ICON: Record<string, LucideIcon> = {
   "supply-base": PackageSearch,
   operations: Workflow,
   data: Database,
+  rules: ScrollText, // the rule register
   sources: BookMarked,
 };
 

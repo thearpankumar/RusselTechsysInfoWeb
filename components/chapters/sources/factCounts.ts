@@ -21,6 +21,7 @@ import * as suppliers from "@/content/suppliers";
 import * as orders from "@/content/orders";
 import * as portfolio from "@/content/portfolio";
 import * as footprint from "@/content/footprint";
+import { newSpecRules } from "@/content/rules";
 
 const MODULES: Record<string, unknown>[] = [
   company,
@@ -42,6 +43,8 @@ const MODULES: Record<string, unknown>[] = [
   orders,
   portfolio,
   footprint,
+  // Only the rules new to the site: the rest are already counted from content/lifecycle.ts.
+  { newSpecRules },
 ];
 
 export const CONFIDENCE_ORDER: Confidence[] = ["reported", "session", "rules", "calc", "estimate", "industry-example"];

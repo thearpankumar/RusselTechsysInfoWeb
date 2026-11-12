@@ -14,6 +14,14 @@ export const openQuestions: OpenQuestion[] = [
   { id: "Q10", question: "Do forecasts drive purchasing broadly, or only long-lead parts?", affects: ["W6", "W8"], status: "open", sources: ["RESEARCH"], confidence: "session" },
   { id: "Q11", question: "Confirm the titles of Vinayak and Purna (not on the website), and Manian's VP title.", affects: ["Stakeholder map"], status: "open", sources: ["RESEARCH", "WS", "S70"], confidence: "session" },
   { id: "Q12", question: "Confirm the ~4-month inventory target, and whether the new DTA unit is a separate plant in IQMS.", affects: ["Outcomes", "Rule 2.1"], status: "open", sources: ["RESEARCH", "S28", "S45"], confidence: "session" },
+  // Business-rules spec §11: open before the logical design is frozen.
+  { id: "Q13", question: "Is forecast within the exclusion horizon always excluded, or only when matching ERP demand exists?", affects: ["Rule 5.2", "Rule 6"], status: "open", sources: ["RULES"], confidence: "rules", note: "Prevents missing demand or double counting." },
+  { id: "Q14", question: "Is the forecast exclusion horizon calculated using exact dates or calendar-month boundaries?", affects: ["Rule 5.1"], status: "open", sources: ["RULES"], confidence: "rules", note: "Determines which forecast periods are excluded." },
+  { id: "Q15", question: "Which revision applies to forecast BOM explosion: the latest accepted revision, or the one effective on the forecast date?", affects: ["Rule 2.2", "Rule 4.2", "Rule 6"], status: "open", sources: ["RULES"], confidence: "rules", note: "Determines the material requirements generated." },
+  { id: "Q16", question: "Which engineering attributes make two component lines distinct?", affects: ["Rule 2.4"], status: "open", sources: ["RULES"], confidence: "rules", note: "Prevents incorrect component consolidation." },
+  { id: "Q17", question: "Do customer BOM submissions contain genuinely hierarchical structures, or mainly flat demand and product lists?", affects: ["Rule 3.1"], status: "open", sources: ["RULES"], confidence: "rules", note: "Determines the customer structure model needed." },
+  { id: "Q18", question: "How are revised customer forecasts handled?", affects: ["Rule 4.2", "Rule 5.2"], status: "open", sources: ["RULES"], confidence: "rules", note: "Prevents repeated forecast submissions from being double counted." },
+  { id: "Q19", question: "Can forecast quantities be revised, cancelled or split across periods?", affects: ["Rule 4.2"], status: "open", sources: ["RULES"], confidence: "rules", note: "Determines how forecast versions and periods are handled." },
 ];
 
 export const howToClose = {

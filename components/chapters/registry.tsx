@@ -14,6 +14,7 @@ import Scale from "./Scale";
 import SupplyBase from "./SupplyBase";
 import Operations from "./Operations";
 import DataFiles from "./DataFiles";
+import Rules from "./Rules";
 import Sources from "./Sources";
 
 export const chapterComponents: Record<ChapterId, ComponentType> = {
@@ -30,5 +31,6 @@ export const chapterComponents: Record<ChapterId, ComponentType> = {
   "supply-base": SupplyBase,
   operations: Operations,
   data: DataFiles,
+  rules: Rules,
   sources: Sources,
 };
