@@ -1,0 +1,26 @@
+# Line endings: LF in the repository and in every working copy, Windows included.
+# Overrides core.autocrlf, so git stops warning "LF will be replaced by CRLF" and
+# editors, ESLint, CI (Linux) and Vercel all see the same bytes.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets: never normalised or diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.glb binary
+*.pdf binary
+*.xlsx binary
+*.zip binary
