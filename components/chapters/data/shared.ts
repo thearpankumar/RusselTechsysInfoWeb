@@ -1,13 +1,14 @@
 // Shared helpers for chapter 13 (files & data dictionary).
-import type { DataFile, DictionaryEntry } from "@/content/types";
+import type { ColumnFlag, DataFile, DictionaryEntry, FileColumn } from "@/content/types";
 import { dataDictionary, dictionaryEntityGroups, entityGroupOf } from "@/content/dataDictionary";
+import { fileColumns } from "@/content/files";
 import { dataColorAt, type DataColor } from "@/lib/dataColors";
 
 export const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export const STATUS_LABEL: Record<DataFile["status"], string> = {
   "in-scope": "In scope",
-  "out-of-scope": "Out of scope",
+  "out-of-scope": "Not in scope",
   "not-available": "Not yet available",
 };
 
@@ -62,3 +63,45 @@ export const fieldCountByFile: Record<string, number> = dataDictionary.reduce<Re
   for (const f of d.files) acc[f] = (acc[f] ?? 0) + 1;
   return acc;
 }, {});
+
+/* ---------- Rossell's column sheets ---------- */
+
+export const BASIS_LABEL: Record<DataFile["basis"], string> = {
+  "rossell-file": "Rossell's column sheet",
+  modelled: "Our model",
+};
+
+export const FLAG_LABEL: Record<ColumnFlag, string> = { yes: "Yes", no: "No", "not-sure": "Not sure", maybe: "Maybe" };
+
+export const REVIEW_LABEL: Record<NonNullable<FileColumn["review"]>, string> = { must: "Must review", good: "Good to review" };
+
+/** Review priority by shape: must = solid, good to review = hollow. */
+export const REVIEW_MARKER: Record<NonNullable<FileColumn["review"]>, { tone: "primary" | "past"; shape: "dot" | "hollow" }> = {
+  must: { tone: "primary", shape: "dot" },
+  good: { tone: "past", shape: "hollow" },
+};
+
+export interface ColumnStats {
+  columns: number;
+  must: number;
+  questions: number;
+  answered: number;
+  unclear: number;
+  generated: number;
+}
+
+export function columnStats(cols: FileColumn[]): ColumnStats {
+  return {
+    columns: cols.length,
+    must: cols.filter((c) => c.review === "must").length,
+    questions: cols.filter((c) => c.question && !c.answer).length,
+    answered: cols.filter((c) => c.answer).length,
+    unclear: cols.filter((c) => c.unclear).length,
+    generated: cols.filter((c) => c.generated === "yes").length,
+  };
+}
+
+export const fileStats = (f: DataFile) => columnStats(fileColumns(f));
+
+/** "15 Oct 2026" from an ISO date. */
+export const shortDate = (iso?: string) => (iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "");

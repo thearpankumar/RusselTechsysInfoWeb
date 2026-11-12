@@ -6,8 +6,8 @@ export default function DataFiles() {
   return (
     <ChapterShell
       id="data"
-      statement="Sixteen reports feed the planning floor. We have mapped every one."
-      lead="Each morning IQMS, the enterprise resource planning (ERP) system, runs its Crystal reports, and the buyers, planners and engineers start from them. These sections cover every file: what it holds, where it comes from, who reads it and a template of its columns, then one dictionary that ties every field to the entity it describes."
+      statement="Sixteen reports feed the planning floor. Seven arrived as Rossell's own column sheets."
+      lead="Each morning IQMS, the enterprise resource planning (ERP) system, runs its Crystal reports, and the buyers, planners and engineers start from them. These sections cover every file: what it holds, where it comes from, who reads it and its columns as Rossell named them, with what each one means and what is still to confirm. One dictionary then ties every column, in every file, to the field it carries."
     >
       <DataChapter />
     </ChapterShell>

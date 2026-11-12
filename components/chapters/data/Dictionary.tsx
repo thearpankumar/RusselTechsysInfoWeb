@@ -4,8 +4,8 @@ import * as React from "react";
 import { Search, X } from "lucide-react";
 import type { DictionaryEntry } from "@/content/types";
 import { dataDictionary, dictionaryEntityGroups, dictionaryNote, entityGroupOf, entityMap } from "@/content/dataDictionary";
-import { files, getFile } from "@/content/files";
-import { Button, Chip, Cite, ConfidenceTag, Kbd } from "@/components/ui-rt";
+import { fileColumns, files, getFile } from "@/content/files";
+import { Button, Chip, Cite, ConfidenceTag, Kbd, Marker } from "@/components/ui-rt";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { dataBg } from "@/lib/dataColors";
 import { cn } from "@/lib/utils";
@@ -19,11 +19,27 @@ export interface DictFilters {
   node: string | null;
   /** Single entity (from a file overlay or the palette). */
   entity: string | null;
+  /** Only fields found in Rossell's own column sheets, or only our modelled ones. */
+  basis: DictionaryEntry["basis"] | null;
 }
 
-export const EMPTY_FILTERS: DictFilters = { q: "", group: null, file: null, node: null, entity: null };
+export const EMPTY_FILTERS: DictFilters = { q: "", group: null, file: null, node: null, entity: null, basis: null };
 
-const hay = new Map(dataDictionary.map((d) => [d, `${d.entity} ${d.field} ${d.type} ${d.definition} ${d.example ?? ""} ${d.usedBy.join(" ")}`.toLowerCase()]));
+/** Rossell's full column names, so "Item Number" also finds the field carried by "Item #". */
+const fullName = (fileId: string, column: string) => {
+  const f = getFile(fileId);
+  return f ? fileColumns(f).find((c) => c.name === column)?.full ?? "" : "";
+};
+
+const hay = new Map(
+  dataDictionary.map((d) => [
+    d,
+    `${d.entity} ${d.field} ${d.type} ${d.definition} ${d.example ?? ""} ${d.usedBy.join(" ")} ${d.columns.map((c) => `${c.column} ${fullName(c.file, c.column)}`).join(" ")}`.toLowerCase(),
+  ])
+);
+
+/** The distinct column names a field goes by across the files. */
+export const knownAs = (d: DictionaryEntry) => [...new Set(d.columns.map((c) => c.column))];
 
 export function filterDictionary(f: DictFilters): DictionaryEntry[] {
   const tokens = f.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -33,6 +49,7 @@ export function filterDictionary(f: DictFilters): DictionaryEntry[] {
     if (f.file && !d.files.includes(f.file)) return false;
     if (nodeEntities && !nodeEntities.includes(d.entity)) return false;
     if (f.entity && d.entity !== f.entity) return false;
+    if (f.basis && d.basis !== f.basis) return false;
     const h = hay.get(d)!;
     return tokens.every((t) => h.includes(t));
   });
@@ -75,7 +92,7 @@ export function Dictionary({
   }, [active]);
 
   const set = (patch: Partial<DictFilters>) => setFilters((f) => ({ ...f, ...patch }));
-  const anyFilter = !!(filters.q || filters.group || filters.file || filters.node || filters.entity);
+  const anyFilter = !!(filters.q || filters.group || filters.file || filters.node || filters.entity || filters.basis);
 
   const grouped = React.useMemo(() => {
     const m = new Map<string, { d: DictionaryEntry; i: number }[]>();
@@ -107,7 +124,7 @@ export function Dictionary({
                 else input.current?.blur();
               }
             }}
-            placeholder={`Search ${dataDictionary.length} fields: names, definitions, examples…`}
+            placeholder={`Search ${dataDictionary.length} fields and their column names…`}
             aria-label="Search the data dictionary"
             className="h-full min-w-0 flex-1 bg-transparent t-body-lg text-on-surface outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
           />
@@ -131,6 +148,31 @@ export function Dictionary({
                 {g.label}
               </Chip>
             ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <p className="t-mono-sm text-muted">Source</p>
+          <div className="flex flex-wrap gap-2">
+            <Chip selected={!filters.basis} onClick={() => set({ basis: null })} count={dataDictionary.length}>
+              All
+            </Chip>
+            <Chip
+              marker={<Marker tone="primary" shape="dot" size={8} />}
+              selected={filters.basis === "rossell-file"}
+              onClick={() => set({ basis: filters.basis === "rossell-file" ? null : "rossell-file" })}
+              count={dataDictionary.filter((d) => d.basis === "rossell-file").length}
+            >
+              In Rossell&apos;s column sheets
+            </Chip>
+            <Chip
+              marker={<Marker tone="past" shape="hollow" size={8} />}
+              selected={filters.basis === "modelled"}
+              onClick={() => set({ basis: filters.basis === "modelled" ? null : "modelled" })}
+              count={dataDictionary.filter((d) => d.basis === "modelled").length}
+            >
+              Our model only
+            </Chip>
           </div>
         </div>
 
@@ -161,23 +203,24 @@ export function Dictionary({
           {node && <ActiveFilter label={`Entity: ${node.label}`} onClear={() => set({ node: null })} />}
           {filters.entity && <ActiveFilter label={`Entity: ${filters.entity}`} onClear={() => set({ entity: null })} />}
           {file && <ActiveFilter label={`File: ${file.name}`} onClear={() => set({ file: null })} />}
+          {filters.basis && <ActiveFilter label={filters.basis === "rossell-file" ? "In Rossell's column sheets" : "Our model only"} onClear={() => set({ basis: null })} />}
           {anyFilter && (
             <Button variant="ghost" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
               Clear all
             </Button>
           )}
-          <span className="ml-auto inline-flex items-center gap-2">
+          <span className="inline-flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto">
             <Cite ids={dictionaryNote.sources} />
             <ConfidenceTag confidence={dictionaryNote.confidence} />
           </span>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
-          <div aria-hidden className="hidden grid-cols-[minmax(0,200px)_minmax(0,1fr)_minmax(0,176px)_minmax(0,200px)] gap-4 border-b border-border px-6 py-3 t-mono-sm text-muted md:grid">
+          <div aria-hidden className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.4fr)] gap-4 border-b border-border px-6 py-3 t-mono-sm text-muted md:grid">
             <span>Field · type</span>
             <span>Definition</span>
             <span>Example (sample)</span>
-            <span>Files · used by</span>
+            <span>Known as · files</span>
           </div>
           <div data-lenis-prevent className="max-h-180 overflow-y-auto overscroll-contain">
             {grouped.length === 0 && <p className="px-6 py-12 text-center t-body-md text-muted">No field matches. Try fewer words or clear the filters.</p>}
@@ -195,7 +238,7 @@ export function Dictionary({
                       <button
                         type="button"
                         onClick={() => onOpenField(i)}
-                        className="grid w-full cursor-pointer grid-cols-1 gap-x-4 gap-y-1 border-b border-border px-6 py-3 text-left transition-colors duration-150 ease-out hover:bg-surface-raised md:grid-cols-[minmax(0,200px)_minmax(0,1fr)_minmax(0,176px)_minmax(0,200px)]"
+                        className="grid w-full cursor-pointer grid-cols-1 gap-x-4 gap-y-1 border-b border-border px-6 py-3 text-left transition-colors duration-150 ease-out hover:bg-surface-raised md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.4fr)]"
                       >
                         <span className="min-w-0">
                           <span className="block t-body-md text-on-surface">{d.field}</span>
@@ -207,10 +250,16 @@ export function Dictionary({
                           {d.example ?? "—"}
                         </span>
                         <span className="min-w-0">
-                          <span className={cn("block truncate t-mono-sm", d.files.length ? "text-body" : "text-muted")} title={d.files.map((id) => getFile(id)?.name ?? id).join(", ")}>
-                            {d.files.length ? d.files.map((id) => pad2(getFile(id)?.index ?? 0)).join(" · ") : "—"}
+                          <span className="flex min-w-0 items-center gap-2" title={d.basis === "rossell-file" ? "Column names from Rossell's column sheets" : "Our model only"}>
+                            <Marker tone={d.basis === "rossell-file" ? "primary" : "past"} shape={d.basis === "rossell-file" ? "dot" : "hollow"} size={8} />
+                            <span className={cn("min-w-0 truncate t-mono-sm", d.columns.length ? "text-body" : "text-muted")}>
+                              {d.columns.length ? knownAs(d).slice(0, 3).join(" · ") : "Our model"}
+                              {knownAs(d).length > 3 && <span className="text-muted"> +{knownAs(d).length - 3}</span>}
+                            </span>
                           </span>
-                          <span className="block truncate t-body-sm text-muted">{d.usedBy.join(" · ")}</span>
+                          <span className="block truncate t-mono-sm text-muted" title={d.files.map((id) => getFile(id)?.name ?? id).join(", ")}>
+                            {d.files.length ? `${d.files.length === 1 ? "File" : "Files"} ${d.files.map((id) => pad2(getFile(id)?.index ?? 0)).join(" · ")}` : "Not in any report yet"}
+                          </span>
                         </span>
                       </button>
                     </li>

@@ -1,10 +1,368 @@
-// The 16 reports in Rossell's report inventory, exactly as catalogued in Notes – RMIG.xlsx (WS).
-// Columns and sampleRows are OUR TEMPLATE DESIGN of what such an IQMS / Crystal report typically holds:
-// sample values are invented, obviously generic, and must be labelled "sample" in the UI.
-import type { DataFile } from "./types";
+// The 16 reports in Rossell's file catalogue (File Catalogue & Business Meaning, FILES; report inventory, WS).
+// Seven reports arrived as Rossell's own column sheets: their column names are exact and their meanings, review
+// priorities, questions and answers come from those sheets (content/fileColumns.ts). The other nine keep OUR modelled
+// layout until Rossell sends the file. Every sample value below is invented, obviously generic, and labelled
+// "sample" in the UI; nothing is copied from Rossell's files.
+import type { DataFile, FileColumn, FileSheet } from "./types";
+import {
+  activeStockColumns,
+  consolidatedBomColumns,
+  exceptionColumns,
+  materialPlannerColumns,
+  mustArriveColumns,
+  openOrderColumns,
+  openOrderWorkingExtra,
+  reorderColumns,
+  reorderWorkingExtra,
+} from "./fileColumns";
 
-type Col = DataFile["columns"][number];
-const c = (name: string, type: string, description: string): Col => ({ name, type, description });
+type Cell = string | number;
+
+/** A modelled column (no Rossell sheet behind it yet). */
+const c = (name: string, type: string, description: string): FileColumn => ({ name, type, description });
+
+/** A sheet whose sample rows are written like a spreadsheet: one array per row, values in column order. */
+function sheet(name: string, columns: FileColumn[], rows: Cell[][], extra: Partial<FileSheet> = {}): FileSheet {
+  const sampleRows = rows.map((r, i) => {
+    if (r.length !== columns.length) throw new Error(`files: sheet "${name}" sample row ${i + 1} has ${r.length} values for ${columns.length} columns`);
+    return Object.fromEntries(columns.map((col, j) => [col.name, r[j]]));
+  });
+  return { name, columns, sampleRows, ...extra };
+}
+
+/** A second sheet built on the same rows as `base` (a buyer's working copy): shared columns keep their values. */
+function derived(base: FileSheet, name: string, columns: FileColumn[], extra: Record<string, Cell[]>, note?: string): FileSheet {
+  const sampleRows = base.sampleRows.map((r, i) =>
+    Object.fromEntries(
+      columns.map((col) => {
+        const v = col.name in extra ? extra[col.name][i] : r[col.name];
+        if (v === undefined) throw new Error(`files: sheet "${name}" has no sample value for "${col.name}" in row ${i + 1}`);
+        return [col.name, v];
+      })
+    )
+  );
+  return { name, columns, sampleRows, note };
+}
+
+const byName = (cols: FileColumn[], name: string) => {
+  const col = cols.find((x) => x.name === name);
+  if (!col) throw new Error(`files: no column "${name}"`);
+  return col;
+};
+
+/* ---------- 1. Active Stock (Rossell's sheet: RT_Active_Stock_Report_With_Value) ---------- */
+
+const activeStock = sheet("Sheet1", activeStockColumns, [
+  ["RT-SMPL-0021", "Connector, circular, shell 13 (sample)", "OEM-SMPL-A01", "RM", "EACH", "WH1-C11-04", "Z-C", 46, 24, 96.5, "WO-SMPL-50112", "L-SAMPLE-2310", "2026-03-12", "", "RCPT-SMPL-91003", "PO-SMPL-77801", "EACH", "EACH", 1, "Supplier B (sample)", 96.5, "PRJ-SMPL-07", "Project A (sample)", "USD", "US Dollar", 84.1],
+  ["RT-SMPL-0034", "Contact, crimp socket, size 22 (sample)", "OEM-SMPL-B07", "RM", "EACH", "WH2-B02-01", "Z-B", 15000, 7500, 0.42, "WO-SMPL-50140", "L-SAMPLE-2412", "2026-02-20", "", "RCPT-SMPL-91001", "PO-SMPL-77822", "EACH", "EACH", 1, "Supplier A (sample)", 0.42, "PRJ-SMPL-11", "Project B (sample)", "USD", "US Dollar", 84.1],
+  ["RT-SMPL-0005", "Wire, 22 AWG, white (sample)", "OEM-SMPL-C12", "RM", "FT", "WH1-A03-02", "Z-A", 4200, 2800, 0.31, "", "L-SAMPLE-2201", "2026-01-15", "", "RCPT-SMPL-91004", "PO-SMPL-77830", "MTR", "FT", 3.281, "Supplier A (sample)", 1.02, "PRJ-SMPL-07", "Project A (sample)", "USD", "US Dollar", 84.1],
+  ["RT-SMPL-0052", "Heat-shrink sleeving, 1/4 in, black (sample)", "OEM-SMPL-D03", "PS", "MTR", "PAN-01", "Z-P", 650, 600, 1850, "", "L-SAMPLE-2601", "2025-11-03", "2028-11-02", "RCPT-SMPL-90877", "PO-SMPL-77830", "MTR", "MTR", 1, "Supplier A (sample)", 1850, "", "", "INR", "Indian Rupee", 1],
+  ["RT-SMPL-0089", "Fibre-optic terminus (sample)", "OEM-SMPL-E11", "RM", "EACH", "QA-HOLD-01", "Z-Q", 30, 0, 38, "", "L-SAMPLE-2507", "2026-06-01", "", "RCPT-SMPL-91002", "PO-SMPL-77844", "EACH", "EACH", 1, "Supplier D (sample)", 38, "PRJ-SMPL-07", "Project A (sample)", "EUR", "Euro", 91.6],
+]);
+
+/* ---------- 2. Exception (Rossell's sheet) ---------- */
+
+const exception = sheet("Data", exceptionColumns, [
+  ["RT-SMPL-0021", "Connector, circular, shell 13 (sample)", 46, "RM", "B", "EACH", "Division A (sample)", 74, 34, "N", "PLANT-SMPL-1", "CC-SMPL-410", "BYR-01", "V-SMPL-002", "CO-SMPL-01", "Circular connector, shell 13, receptacle (sample)", "N", 84, 40, 120],
+  ["RT-SMPL-0034", "Contact, crimp socket, size 22 (sample)", 15000, "RM", "A", "EACH", "Division A (sample)", 7000, 2000, "N", "PLANT-SMPL-2", "CC-SMPL-410", "BYR-02", "V-SMPL-001", "CO-SMPL-01", "Crimp socket contact, size 22 (sample)", "N", 56, 5000, 22000],
+  ["RT-SMPL-0005", "Wire, 22 AWG, white (sample)", 4200, "RM", "A", "FT", "Division A (sample)", 1320, 320, "Y", "PLANT-SMPL-1", "CC-SMPL-420", "BYR-03", "V-SMPL-001", "CO-SMPL-01", "Hook-up wire, 22 AWG, white (sample)", "N", 28, 1000, 5520],
+  ["RT-SMPL-0052", "Heat-shrink sleeving, 1/4 in, black (sample)", 650, "PS", "A", "MTR", "Division B (sample)", 0, 0, "N", "PLANT-SMPL-1", "CC-SMPL-430", "BYR-01", "V-SMPL-001", "CO-SMPL-01", "Heat-shrink sleeving, 2:1, black (sample)", "N", 21, 300, 400],
+  ["RT-SMPL-0089", "Fibre-optic terminus (sample)", 30, "RM", "C", "EACH", "Division A (sample)", 30, 30, "N", "PLANT-SMPL-1", "CC-SMPL-410", "BYR-02", "V-SMPL-004", "CO-SMPL-01", "Fibre-optic terminus, multimode (sample)", "Y", 112, 0, 60],
+]);
+
+/* ---------- 3. Exception with Must Arrive By (Rossell's sheet) ---------- */
+
+const mustArrive = sheet("Sheet1", mustArriveColumns, [
+  ["RT-SMPL-0021", "RM", "Connector, circular, shell 13 (sample)", "2026-11-16", "2027-02-08", 34],
+  ["RT-SMPL-0034", "RM", "Contact, crimp socket, size 22 (sample)", "2026-10-08", "2026-12-03", 2000],
+  ["RT-SMPL-0005", "RM", "Wire, 22 AWG, white (sample)", "2026-11-10", "2026-12-08", 320],
+  ["RT-SMPL-0089", "RM", "Fibre-optic terminus (sample)", "2026-09-14", "2027-01-04", 30],
+  ["RT-SMPL-0021", "RM", "Connector, circular, shell 13 (sample)", "2026-12-07", "2027-03-01", 40],
+]);
+
+/* ---------- 4. RT Consolidated BOM (Rossell's sheet) ---------- */
+
+const consolidatedBom = sheet("Sheet1", consolidatedBomColumns, [
+  ["WB-SMPL-011", "C", "PRJ-SMPL-07", "A", 10, "OP-10", "Wire bundle A (sample)", "RT-SMPL-0005", "RM", "OEM-SMPL-C12", 200, "FT"],
+  ["WB-SMPL-011", "C", "PRJ-SMPL-07", "A", 10, "OP-20", "Wire bundle A (sample)", "RT-SMPL-0034", "RM", "OEM-SMPL-B07", 48, "EACH"],
+  ["WB-SMPL-011", "C", "PRJ-SMPL-07", "A", 10, "OP-20", "Wire bundle A (sample)", "RT-SMPL-0021", "RM", "OEM-SMPL-A01", 2, "EACH"],
+  ["WB-SMPL-011", "C", "PRJ-SMPL-07", "A", 10, "OP-30", "Wire bundle A (sample)", "RT-SMPL-0052", "PS", "OEM-SMPL-D03", 1.5, "MTR"],
+  ["WB-SMPL-011", "C", "PRJ-SMPL-07", "A", 10, "OP-30", "Wire bundle A (sample)", "RT-SMPL-0089", "RM", "OEM-SMPL-E11", 4, "EACH"],
+]);
+
+/* ---------- 5. RT Open Order (Rossell's sheets: Raw Data, Working Sheet, Summary) ---------- */
+
+const openOrderRaw = sheet("Raw Data", openOrderColumns, [
+  ["PR-SMPL-3301", "PO-SMPL-77801", "2026-08-20", "Supplier B (sample)", "RT-SMPL-0021", "OEM-SMPL-A01", "Project A (sample)", "", "Connector, circular, shell 13 (sample)", 40, 96.5, "USD", 3860, 20, 1930, 20, 1930, "2026-11-24", "2026-12-05", "Buyer 01 (sample)", "Yes", "EACH", 1, "REL-SMPL-000101", "RAW MATERIAL", "Open"],
+  ["PR-SMPL-3302", "PO-SMPL-77822", "2026-09-02", "Supplier A (sample)", "RT-SMPL-0034", "OEM-SMPL-B07", "Project B (sample)", "", "Contact, crimp socket, size 22 (sample)", 5000, 0.42, "USD", 2100, 3000, 1260, 2000, 840, "2026-12-03", "2026-11-28", "Buyer 02 (sample)", "Yes", "EACH", 1, "REL-SMPL-000102", "RAW MATERIAL", "Partly received"],
+  ["PR-SMPL-3303", "PO-SMPL-77830", "2026-10-01", "Supplier A (sample)", "RT-SMPL-0005", "OEM-SMPL-C12", "Project A (sample)", "", "Wire, 22 AWG, white (sample)", 1500, 1.02, "USD", 1530, 1000, 1020, 500, 510, "2026-12-08", "2026-12-08", "Buyer 03 (sample)", "Yes", "MTR", 1, "REL-SMPL-000103", "RAW MATERIAL", "Partly received"],
+  ["PR-SMPL-3304", "PO-SMPL-77830", "2026-10-01", "Supplier A (sample)", "RT-SMPL-0052", "OEM-SMPL-D03", "", "", "Heat-shrink sleeving, 1/4 in, black (sample)", 300, 1850, "INR", 555000, 0, 0, 300, 555000, "2026-12-15", "", "Buyer 01 (sample)", "No", "MTR", 2, "REL-SMPL-000104", "RAW MATERIAL", "Open"],
+  ["PR-SMPL-3305", "PO-SMPL-77844", "2026-10-12", "Supplier D (sample)", "RT-SMPL-0089", "OEM-SMPL-E11", "Project A (sample)", "", "Fibre-optic terminus (sample)", 30, 38, "EUR", 1140, 0, 0, 30, 1140, "2027-01-05", "2027-02-10", "Buyer 02 (sample)", "Yes", "EACH", 1, "REL-SMPL-000105", "RAW MATERIAL", "Open"],
+]);
+
+const openOrderWorkingCols = (() => {
+  const i = openOrderColumns.findIndex((x) => x.name === "Promise.Date");
+  return [...openOrderColumns.slice(0, i + 1), byName(openOrderWorkingExtra, "Month"), ...openOrderColumns.slice(i + 1), byName(openOrderWorkingExtra, "Open Order Value In USD")];
+})();
+
+const openOrderWorking = derived(
+  openOrderRaw,
+  "Working Sheet",
+  openOrderWorkingCols,
+  { Month: ["Dec-2026", "Nov-2026", "Dec-2026", "Dec-2026", "Feb-2027"], "Open Order Value In USD": [1930, 840, 510, 6599, 1243] },
+  "The buyers' working copy of the raw data, with two added columns."
+);
+
+/** Summary pivot: open-order value in USD by category (rows) and month-end (columns); sample figures only. */
+const SUMMARY_MONTHS = ["2026-10-31", "2026-11-30", "2026-12-31", "2027-01-31", "2027-02-28", "2027-03-31"];
+const summaryColumns: FileColumn[] = [
+  c("Sum of Open Order Value In USD", "string", "Row label: the category the open-order value is summed for."),
+  c("Overdue", "number", "Open-order value already past its date."),
+  ...SUMMARY_MONTHS.map((m) => c(m, "number", `Open-order value due in the month ending ${m}.`)),
+  c("Grand Total", "number", "Row total across all months."),
+];
+const summaryRows: Cell[][] = (() => {
+  const cats: [string, number[]][] = [
+    ["CAPITAL", [0, 1200, 0, 4500, 0, 0, 0]],
+    ["EXPENSE", [300, 800, 650, 400, 350, 300, 250]],
+    ["OPEX", [0, 1500, 1500, 1500, 1500, 1500, 1500]],
+    ["PACKING", [150, 900, 700, 650, 500, 450, 400]],
+    ["RAW MATERIAL", [12000, 48000, 52000, 39000, 21000, 15000, 9000]],
+    ["SERVICE PROVIDERS", [0, 2200, 1800, 1600, 1200, 900, 600]],
+  ];
+  const rows: Cell[][] = cats.map(([label, v]) => [label, ...v, v.reduce((s, x) => s + x, 0)]);
+  const total = summaryColumns.slice(1).map((_, j) => rows.reduce((s, r) => s + (r[j + 1] as number), 0));
+  return [...rows, ["Grand Total", ...total]];
+})();
+const openOrderSummary = sheet("Summary", summaryColumns, summaryRows, {
+  pivot: true,
+  note: "A pivot of the Working Sheet: open-order value in USD by category and month-end. Rossell's file runs month by month to 2029; six months are shown. What the categories are and how each is calculated is still open (Q24).",
+});
+
+/* ---------- 6. Reorder Order (Rossell's sheets: Raw data, Working Sheet) ---------- */
+
+const reorderRaw = sheet("Raw data", reorderColumns, [
+  ["RT-SMPL-0021", "RM", "B", "OEM-SMPL-A01", "PRJ-SMPL-07; PRJ-SMPL-11", 12, 74, 120, "EACH", 46, 30, 50, "", 40, "EACH", 40, "PO-SMPL-77801", "Supplier B (sample)", 96.5, "USD", "Short", 0, "Division A (sample)"],
+  ["RT-SMPL-0034", "RM", "A", "OEM-SMPL-B07", "PRJ-SMPL-11", 8, 7000, 22000, "EACH", 15000, 8000, 5000, "", 5000, "EACH", 5000, "PO-SMPL-77822", "Supplier A (sample)", 0.42, "USD", "OK", 0, "Division A (sample)"],
+  ["RT-SMPL-0005", "RM", "A", "OEM-SMPL-C12", "PRJ-SMPL-07", 4, 1320, 5520, "FT", 4200, 2000, 3281, "", 500, "MTR", 1640.5, "PO-SMPL-77830", "Supplier A (sample)", 1.02, "USD", "Short", 0, "Division A (sample)"],
+  ["RT-SMPL-0052", "PS", "A", "OEM-SMPL-D03", "", 3, 0, 400, "MTR", 650, 200, 300, "", 300, "MTR", 300, "PO-SMPL-77830", "Supplier A (sample)", 1850, "INR", "Excess", 150, "Division B (sample)"],
+  ["RT-SMPL-0089", "RM", "C", "OEM-SMPL-E11", "PRJ-SMPL-07", 16, 30, 60, "EACH", 30, 20, 50, "", 30, "EACH", 30, "PO-SMPL-77844", "Supplier D (sample)", 38, "EUR", "Short", 0, "Division A (sample)"],
+]);
+
+const reorderWorking = derived(
+  reorderRaw,
+  "Working Sheet",
+  [...reorderColumns.filter((x) => x.name !== "Div"), ...reorderWorkingExtra],
+  {
+    Buyers: ["Buyer 01 (sample)", "Buyer 02 (sample)", "Buyer 03 (sample)", "Buyer 01 (sample)", "Buyer 02 (sample)"],
+    Check: ["Review", "OK", "Review", "OK", "Review"],
+    "Expection Qty": [34, 2000, 320, 0, 30],
+    "Revised Material status": ["Short", "OK", "Short", "Excess", "Short"],
+    "ISA Qty": [10, 0, 0, 0, 0],
+    "TBO Qty": [24, 2000, 320, 0, 30],
+    "Revised Pullin": [0, 0, 0, 150, 0],
+    "Shortage Month considering OPOR": ["Feb-2027", "", "Dec-2026", "", "Jan-2027"],
+  },
+  "The buyers' working copy: Div is replaced by Buyers (its full name in the sheet is still Div) and eight review columns are added."
+);
+
+/* ---------- 16. Material Planner (Rossell's sheet: IQMS Material Planner) ---------- */
+
+const materialPlanner = sheet("sheet1", materialPlannerColumns, [
+  ["RT-SMPL-0021", "OEM-SMPL-A01", "Connector, circular, shell 13 (sample)", "PRJ-SMPL-07", 0, 16, 8, "Dec-2026", "EACH", 46, 24, 0, 10, 12, 8, 30, 0, "No", "2026-11-07", 20, "L-SAMPLE-2310", 40, 20, "2026-12-05", "Supplier B (sample)", "PO-SMPL-77801", "Open", "2026-12-05", "Partial delivery expected", "RM", "2026-11-12"],
+  ["RT-SMPL-0034", "OEM-SMPL-B07", "Contact, crimp socket, size 22 (sample)", "PRJ-SMPL-11", 0, 6400, 4400, "Dec-2026", "EACH", 15000, 7500, 0, 4500, 3000, 2000, 8000, 0, "No", "2026-11-06", 3000, "L-SAMPLE-2412", 2000, 2000, "2026-11-28", "Supplier A (sample)", "PO-SMPL-77822", "Open", "2026-11-28", "", "RM", "2026-11-12"],
+  ["RT-SMPL-0005", "OEM-SMPL-C12", "Wire, 22 AWG, white (sample)", "PRJ-SMPL-07", 12, 1600, 1600, "Nov-2026", "FT", 4200, 2800, 0, 600, 0, 0, 2000, 0, "No", "2026-11-07", 3281, "L-SAMPLE-2608", 500, 500, "2026-12-08", "Supplier A (sample)", "PO-SMPL-77830", "Open", "2026-12-08", "", "RM", "2026-11-12"],
+  ["RT-SMPL-0052", "OEM-SMPL-D03", "Heat-shrink sleeving, 1/4 in, black (sample)", "PRJ-SMPL-SEMI", 0, 520, 0, "Jun-2027", "MTR", 650, 0, 600, 0, 50, 0, 200, 0, "Yes", "2026-09-30", 300, "L-SAMPLE-2601", 300, 300, "2026-12-15", "Supplier A (sample)", "PO-SMPL-77830", "Not acknowledged", "", "Shelf life tracked", "PS", "2026-11-12"],
+  ["RT-SMPL-0089", "OEM-SMPL-E11", "Fibre-optic terminus (sample)", "PRJ-SMPL-07", 0, 60, 0, "Jan-2027", "EACH", 30, 0, 0, 0, 30, 30, 20, 0, "No", "2026-11-06", 30, "L-SAMPLE-2507", 30, 30, "2027-02-10", "Supplier D (sample)", "PO-SMPL-77844", "Open", "2027-02-10", "Promise after need date", "RM", "2026-11-12"],
+]);
+
+/* ---------- modelled files (no Rossell sheet yet) ---------- */
+
+const forecastCols = [
+  c("Customer", "string", "Customer code"),
+  c("File Date", "date", "Date the forecast file was downloaded"),
+  c("Customer Part No", "string", "Customer's part number for the finished good"),
+  c("FG Part No", "string", "Rossell finished good (wire bundle) number, mapped from the customer part"),
+  c("Bucket Start", "date", "Start of the forecast period (week / month)"),
+  c("Forecast Qty", "number", "Forecast quantity in the bucket"),
+  c("Label", "string", "Customer nomenclature (ignored in consolidation)"),
+  c("Months Out", "number", "Months from file date"),
+  c("In Exclusion Horizon", "boolean", "True if inside the configurable exclusion horizon (for example 2 months, 6 for LAM)"),
+];
+const forecast = sheet("Template (our model)", forecastCols, [
+  ["CUST-SEMI-01", "2026-11-10", "CPN-SMPL-8821", "WB-SMPL-220", "2026-12-01", 160, "Firm-ish", 1, "true"],
+  ["CUST-SEMI-01", "2026-11-10", "CPN-SMPL-8821", "WB-SMPL-220", "2027-03-01", 210, "Plan", 4, "true"],
+  ["CUST-SEMI-01", "2026-11-10", "CPN-SMPL-8821", "WB-SMPL-220", "2027-06-01", 260, "Plan", 7, "false"],
+  ["CUST-SEMI-02", "2026-11-10", "CPN-SMPL-1407", "WB-SMPL-305", "2027-02-01", 90, "Upside", 3, "false"],
+  ["CUST-AERO-02", "2026-11-09", "CPN-SMPL-0042", "WB-SMPL-011", "2027-04-01", 24, "LTA", 5, "false"],
+]);
+
+const salesOrderCols = [
+  c("Sales Order", "string", "Internal sales order number"),
+  c("Customer", "string", "Customer code"),
+  c("Project", "string", "Project the order belongs to"),
+  c("Customer PO", "string", "Customer purchase order number"),
+  c("PO Revision", "string", "Revision of the customer PO; the latest one is authoritative (to confirm, Q21)"),
+  c("Release / Line", "string", "Release or schedule line under the PO"),
+  c("FG Part No", "string", "Finished good ordered"),
+  c("Blanket Qty", "number", "Total quantity on a blanket order"),
+  c("Backlog Qty", "number", "Ordered and not yet shipped"),
+  c("Request Date", "date", "Customer's requested date"),
+  c("Promise Date", "date", "Rossell's committed date"),
+  c("Shipped Qty", "number", "Quantity already shipped"),
+  c("Last Ship Date", "date", "Date of the last shipment"),
+];
+const salesOrder = sheet("Template (our model)", salesOrderCols, [
+  ["SO-SMPL-30011", "CUST-AERO-01", "PRJ-SMPL-07", "CPO-SMPL-4501", "C", "1/2", "WB-SMPL-011", 1000, 380, "2027-03-31", "2027-03-24", 620, "2026-10-30"],
+  ["SO-SMPL-30011", "CUST-AERO-01", "PRJ-SMPL-07", "CPO-SMPL-4501", "C", "1/3", "WB-SMPL-011", 1000, 300, "2027-06-30", "2027-06-23", 0, ""],
+  ["SO-SMPL-30012", "CUST-DEF-01", "PRJ-SMPL-11", "CPO-SMPL-6120", "A", "1/1", "WB-SMPL-410", 60, 60, "2027-01-15", "2027-01-15", 0, ""],
+  ["SO-SMPL-30013", "CUST-SEMI-01", "", "CPO-SMPL-9910", "B", "1/1", "WB-SMPL-220", 0, 40, "2026-12-14", "2026-12-14", 0, ""],
+  ["SO-SMPL-30014", "CUST-SPACE-01", "PRJ-SMPL-SP1", "CPO-SMPL-7001", "A", "2/1", "WB-SMPL-901", 12, 4, "2026-11-30", "2026-12-05", 8, "2026-11-02"],
+]);
+
+const grnCols = [
+  c("GRN No", "string", "Goods received note number"),
+  c("GRN Date", "date", "Date received"),
+  c("Supplier", "string", "Supplier name / code"),
+  c("PO No", "string", "Supplier PO the receipt is booked against"),
+  c("PO line Number", "number", "PO line"),
+  c("RT Part Number", "string", "Rossell part number"),
+  c("Received Qty", "number", "Quantity received"),
+  c("Accepted Qty", "number", "Quantity accepted by incoming QA"),
+  c("Rejected Qty", "number", "Quantity rejected"),
+  c("UOM", "enum", "Unit of measure"),
+  c("Lot No", "string", "Lot / batch"),
+  c("Location", "string", "Receiving location (inward QC, stores…)"),
+  c("Posting Status", "enum", "Posted / Unposted / Void: only posted receipts may count (to confirm, Q22)"),
+  c("CoC Ref", "string", "Certificate of conformance reference"),
+];
+const grn = sheet("Template (our model)", grnCols, [
+  ["GRN-SMPL-91001", "2026-11-06", "Supplier A (sample)", "PO-SMPL-77822", 1, "RT-SMPL-0034", 3000, 3000, 0, "EACH", "L-SAMPLE-2412", "WH2-B02-01", "Posted", "COC-SMPL-5531"],
+  ["GRN-SMPL-91002", "2026-11-06", "Supplier D (sample)", "PO-SMPL-77750", 2, "RT-SMPL-0089", 30, 0, 30, "EACH", "L-SAMPLE-2507", "QA-HOLD-01", "Posted", "COC-SMPL-5532"],
+  ["GRN-SMPL-91003", "2026-11-07", "Supplier B (sample)", "PO-SMPL-77801", 1, "RT-SMPL-0021", 20, 20, 0, "EACH", "L-SAMPLE-2310", "INWARD-QC", "Unposted", "COC-SMPL-5540"],
+  ["GRN-SMPL-91004", "2026-11-07", "Supplier A (sample)", "PO-SMPL-77830", 1, "RT-SMPL-0005", 1000, 1000, 0, "MTR", "L-SAMPLE-2608", "WH1-A03-02", "Posted", "COC-SMPL-5544"],
+  ["GRN-SMPL-91005", "2026-11-08", "Supplier A (sample)", "PO-SMPL-77830", 2, "RT-SMPL-0052", 100, 0, 0, "MTR", "L-SAMPLE-2611", "INWARD-QC", "Void", "COC-SMPL-5550"],
+]);
+
+const sourcingCols = [
+  c("Item No", "string", "Rossell part number"),
+  c("MPN", "string", "Manufacturer part number"),
+  c("Manufacturer", "string", "Approved manufacturer"),
+  c("Supplier", "string", "Supplier / distributor"),
+  c("Price", "number", "Agreed unit price"),
+  c("Currency", "enum", "USD / INR / EUR"),
+  c("Price Break Qty", "number", "Quantity the price applies from"),
+  c("Valid From", "date", "Price validity start"),
+  c("Valid To", "date", "Price validity end"),
+  c("Lead Time (days)", "number", "Quoted lead time"),
+  c("Source Type", "enum", "Manufacturer / Authorised distributor / Customer-directed"),
+];
+const sourcing = sheet("Template (our model)", sourcingCols, [
+  ["RT-SMPL-0021", "OEM-SMPL-A01", "Manufacturer D (sample)", "Supplier B (sample)", 96.5, "USD", 10, "2026-04-01", "2027-03-31", 84, "Authorised distributor"],
+  ["RT-SMPL-0034", "OEM-SMPL-B07", "Manufacturer A (sample)", "Supplier A (sample)", 0.42, "USD", 1000, "2026-01-01", "2026-12-31", 56, "Authorised distributor"],
+  ["RT-SMPL-0005", "OEM-SMPL-C12", "Manufacturer G (sample)", "Supplier A (sample)", 1.02, "USD", 1000, "2026-07-01", "2027-06-30", 28, "Authorised distributor"],
+  ["RT-SMPL-0052", "OEM-SMPL-D03", "Manufacturer C (sample)", "Supplier A (sample)", 1850, "INR", 100, "2026-04-01", "2027-03-31", 21, "Authorised distributor"],
+  ["RT-SMPL-0089", "OEM-SMPL-E11", "Manufacturer E (sample)", "Supplier D (sample)", 38, "EUR", 50, "2026-04-01", "2026-12-31", 112, "Customer-directed"],
+]);
+
+const vendorCols = [
+  c("Vendor Code", "string", "IQMS vendor ID"),
+  c("Vendor Name", "string", "Supplier name"),
+  c("Category", "enum", "Manufacturer / Distributor / Special process / Logistics / Service"),
+  c("Country", "string", "Supplier country"),
+  c("Approval Status", "enum", "Approved / Conditional / Disqualified"),
+  c("Certifications", "string", "AS9100 / AS9120 / ISO 9001 / NADCAP"),
+  c("Approved Since", "date", "First approval date"),
+  c("Next Audit", "date", "Next supplier audit due"),
+  c("Payment Terms", "string", "e.g. Net 60"),
+];
+const vendorMaster = sheet("Template (our model)", vendorCols, [
+  ["V-SMPL-001", "Supplier A (sample)", "Distributor", "USA", "Approved", "AS9120, ISO 9001", "2016-05-01", "2027-05-01", "Net 60"],
+  ["V-SMPL-002", "Supplier B (sample)", "Distributor", "India", "Approved", "AS9120", "2019-02-11", "2027-02-11", "Net 45"],
+  ["V-SMPL-003", "Supplier C (sample)", "Manufacturer", "USA", "Approved", "AS9100, ISO 9001", "2014-09-20", "2026-12-15", "Net 30"],
+  ["V-SMPL-004", "Supplier D (sample)", "Manufacturer", "Germany", "Conditional", "ISO 9001", "2025-08-01", "2026-12-01", "Net 30"],
+  ["V-SMPL-005", "Forwarder (sample)", "Logistics", "India", "Approved", "ISO 9001", "2018-01-15", "2027-01-15", "Net 15"],
+]);
+
+const promiseCols = [
+  c("PO No", "string", "Rossell supplier PO number"),
+  c("PO line Number", "number", "PO line"),
+  c("Unique Rel ID", "string", "Release the promise applies to (how it relates to PO and line is still open, Q20)"),
+  c("RT Part Number", "string", "Rossell part number"),
+  c("Supplier Name", "string", "Supplier"),
+  c("Bal. Qty.", "number", "Quantity not yet received on the release"),
+  c("Req.date", "date", "Rossell's required date (may be buyer-overridden)"),
+  c("Promise.Date", "date", "Supplier's committed date (ETA)"),
+  c("Promise Qty", "number", "Quantity committed for that date (partials allowed)"),
+  c("Change Type", "enum", "New / Pull-in / Push-out / Split"),
+  c("Source", "enum", "Email / Portal / Phone"),
+  c("Updated By", "string", "Buyer / SCM user"),
+];
+const promiseUpload = sheet("Template (our model)", promiseCols, [
+  ["PO-SMPL-77801", 1, "REL-SMPL-000101", "RT-SMPL-0021", "Supplier B (sample)", 20, "2026-11-24", "2026-12-05", 20, "Push-out", "Email", "BYR-01"],
+  ["PO-SMPL-77822", 1, "REL-SMPL-000102", "RT-SMPL-0034", "Supplier A (sample)", 2000, "2026-12-03", "2026-11-28", 2000, "Pull-in", "Email", "BYR-02"],
+  ["PO-SMPL-77830", 1, "REL-SMPL-000103", "RT-SMPL-0005", "Supplier A (sample)", 500, "2026-12-08", "2026-12-08", 500, "New", "Portal", "SCM-04"],
+  ["PO-SMPL-77830", 2, "REL-SMPL-000104", "RT-SMPL-0052", "Supplier A (sample)", 300, "2026-12-15", "2026-12-15", 200, "Split", "Phone", "BYR-01"],
+  ["PO-SMPL-77830", 2, "REL-SMPL-000106", "RT-SMPL-0052", "Supplier A (sample)", 300, "2026-12-15", "2027-01-12", 100, "Split", "Phone", "BYR-01"],
+]);
+
+const mrpCols = [
+  c("PO No", "string", "Rossell supplier PO number"),
+  c("PO line Number", "number", "PO line"),
+  c("Unique Rel ID", "string", "Release on the line"),
+  c("RT Part Number", "string", "Rossell part number"),
+  c("Bal. Qty.", "number", "Not yet received"),
+  c("Promise.Date", "date", "Current due / promise date on the PO"),
+  c("New Need Date", "date", "Date MRP now says it is needed"),
+  c("MRP Message", "enum", "Expedite / De-expedite / Cancel / OK"),
+  c("Days Shift", "number", "New need date − current date"),
+];
+const openOrderMrp = sheet("Template (our model)", mrpCols, [
+  ["PO-SMPL-77801", 1, "REL-SMPL-000101", "RT-SMPL-0021", 20, "2026-12-05", "2026-11-24", "Expedite", -11],
+  ["PO-SMPL-77822", 1, "REL-SMPL-000102", "RT-SMPL-0034", 2000, "2026-11-28", "2026-12-03", "OK", 5],
+  ["PO-SMPL-77760", 2, "REL-SMPL-000090", "RT-SMPL-0070", 500, "2026-11-30", "2027-02-15", "De-expedite", 77],
+  ["PO-SMPL-77744", 1, "REL-SMPL-000081", "RT-SMPL-0091", 10, "2026-12-12", "", "Cancel", 0],
+  ["PO-SMPL-77830", 1, "REL-SMPL-000103", "RT-SMPL-0005", 500, "2026-12-08", "2026-12-08", "OK", 0],
+]);
+
+const contactCols = [
+  c("Vendor Code", "string", "IQMS vendor ID"),
+  c("Vendor Name", "string", "Supplier name"),
+  c("Contact Role", "enum", "Sales / Order desk / Expediting / Quality"),
+  c("Email", "string", "Contact email"),
+  c("Phone", "string", "Contact phone"),
+  c("Time Zone", "string", "Supplier time zone"),
+  c("Preferred Channel", "enum", "Email / Portal / Phone"),
+];
+const supplierContact = sheet("Template (our model)", contactCols, [
+  ["V-SMPL-001", "Supplier A (sample)", "Order desk", "orders@supplier-a.example", "+1-555-0100", "America/Chicago", "Email"],
+  ["V-SMPL-002", "Supplier B (sample)", "Sales", "sales@supplier-b.example", "+91-80-5550-0101", "Asia/Kolkata", "Portal"],
+  ["V-SMPL-003", "Supplier C (sample)", "Expediting", "expedite@supplier-c.example", "+1-555-0102", "America/New_York", "Email"],
+  ["V-SMPL-004", "Supplier D (sample)", "Quality", "quality@supplier-d.example", "+49-30-5550-0103", "Europe/Berlin", "Phone"],
+  ["V-SMPL-005", "Forwarder (sample)", "Order desk", "ops@forwarder.example", "+91-80-5550-0104", "Asia/Kolkata", "Email"],
+]);
+
+const userCols = [
+  c("User ID", "string", "Login ID"),
+  c("Name", "string", "Display name"),
+  c("Department", "enum", "SCM / PPC / Engineering / Sourcing / IT / Finance …"),
+  c("Designation", "enum", "VP … Associate Engineer"),
+  c("Role", "enum", "Buyer / Planner / SCM / Viewer / Admin"),
+  c("Plant", "string", "Home plant"),
+  c("Projects", "string", "Projects the user can see"),
+  c("Active", "boolean", "Account active"),
+];
+const userDetails = sheet("Template (our model)", userCols, [
+  ["u.sample01", "Sample User 01", "SCM", "Principal Engineer", "Buyer", "PLANT-SMPL-1", "PRJ-SMPL-07; PRJ-SMPL-11", "true"],
+  ["u.sample02", "Sample User 02", "PPC", "Manager", "Planner", "PLANT-SMPL-1", "All", "true"],
+  ["u.sample03", "Sample User 03", "SCM", "Senior Manager", "SCM", "PLANT-SMPL-2", "All", "true"],
+  ["u.sample04", "Sample User 04", "Engineering", "Engineer", "Viewer", "PLANT-SMPL-1", "PRJ-SMPL-07", "true"],
+  ["u.sample05", "Sample User 05", "IT Support", "Team Lead", "Admin", "PLANT-SMPL-1", "All", "false"],
+]);
+
+/* ---------- the catalogue ---------- */
+
+const SRC = ["WS", "FILES"];
 
 export const files: DataFile[] = [
   {
@@ -14,37 +372,19 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "input",
     what: "Current stock",
+    notes: "Current stock position used by materials planning.",
     sourceSystem: "IQMS ERP",
     mechanism: "Crystal Reports-SQL via ERP",
     trigger: "Stock updates",
     refresh: "Every morning",
     creates: "Feature in ERP",
     consumers: ["Buyer", "PPC (Production Planning & Control)"],
-    plainMeaning: "What is physically on the shelves this morning, part by part and lot by lot. Planning only counts the 'free' part of it: not already in WIP and not already kitted.",
-    columns: [
-      c("Item No", "string", "Rossell internal raw-material (RM) number"),
-      c("Description", "string", "Material description"),
-      c("Rev", "string", "Item revision"),
-      c("Plant", "string", "Rossell plant (BLR-P1, BLR-P2, USA)"),
-      c("Location", "string", "Stores bin / location code"),
-      c("Lot No", "string", "Supplier or internal lot for traceability"),
-      c("Date Code", "string", "Manufacturer date code (YYWW)"),
-      c("On Hand", "number", "Quantity physically in stock"),
-      c("UOM", "enum", "EA, FT, M"),
-      c("In WIP", "number", "Quantity issued to open work orders"),
-      c("Kitted", "number", "Quantity already in kits"),
-      c("Free Qty", "number", "On Hand − In WIP − Kitted: what planning may use"),
-      c("QA Status", "enum", "Accepted / On hold / Quarantine"),
-      c("Last GRN", "date", "Date of the last goods receipt for this item"),
-    ],
-    sampleRows: [
-      { "Item No": "RM-SMPL-0005", Description: "Wire, M22759/16 type, 22 AWG, white", Rev: "A", Plant: "BLR-P1", Location: "WH1-A03-02", "Lot No": "L-SAMPLE-2201", "Date Code": "2634", "On Hand": 4200, UOM: "FT", "In WIP": 800, Kitted: 600, "Free Qty": 2800, "QA Status": "Accepted", "Last GRN": "2026-10-28" },
-      { "Item No": "RM-SMPL-0021", Description: "Connector, MIL-DTL-38999 type, shell 13", Rev: "B", Plant: "BLR-P1", Location: "WH1-C11-04", "Lot No": "L-SAMPLE-2310", "Date Code": "2628", "On Hand": 46, UOM: "EA", "In WIP": 12, Kitted: 10, "Free Qty": 24, "QA Status": "Accepted", "Last GRN": "2026-10-15" },
-      { "Item No": "RM-SMPL-0034", Description: "Contact, crimp socket, size 22", Rev: "A", Plant: "BLR-P2", Location: "WH2-B02-01", "Lot No": "L-SAMPLE-2412", "Date Code": "2630", "On Hand": 15000, UOM: "EA", "In WIP": 3000, Kitted: 4500, "Free Qty": 7500, "QA Status": "Accepted", "Last GRN": "2026-11-02" },
-      { "Item No": "RM-SMPL-0045", Description: "Backshell, AS85049 type, shell 15", Rev: "A", Plant: "BLR-P1", Location: "QA-HOLD-01", "Lot No": "L-SAMPLE-2507", "Date Code": "2622", "On Hand": 30, UOM: "EA", "In WIP": 0, Kitted: 0, "Free Qty": 0, "QA Status": "On hold", "Last GRN": "2026-11-06" },
-      { "Item No": "RM-SMPL-0052", Description: "Heat-shrink sleeving, 1/4\", black", Rev: "A", Plant: "USA", Location: "TPE-R01", "Lot No": "L-SAMPLE-2601", "Date Code": "2618", "On Hand": 650, UOM: "FT", "In WIP": 50, Kitted: 0, "Free Qty": 600, "QA Status": "Accepted", "Last GRN": "2026-09-30" },
-    ],
-    sources: ["WS"],
+    plainMeaning: "What is in stock this morning, item by item and lot by lot: where it sits, what it cost, which PO it came on and which project it belongs to. Planning counts the available quantity (Avl Qty), not everything on hand.",
+    basis: "rossell-file",
+    workbook: "RT_Active_Stock_Report_With_Value 15-10-2026 07.41.xlsx",
+    extractDate: "2026-10-15",
+    sheets: [activeStock],
+    sources: SRC,
   },
   {
     id: "exception",
@@ -53,34 +393,19 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "input",
     what: "What you need as quantity",
+    notes: "Identifies required material quantity / deficiency.",
     sourceSystem: "IQMS ERP",
     mechanism: "Default report",
     trigger: "Stock updates",
     refresh: "Every morning",
     creates: "Feature in ERP",
     consumers: ["Buyer"],
-    plainMeaning: "The ERP's MRP shortage list: for each part, how much more is needed than is on hand or on order. The buyer's to-do list each morning.",
-    columns: [
-      c("Item No", "string", "RM number"),
-      c("Description", "string", "Material description"),
-      c("Plant", "string", "Rossell plant"),
-      c("Gross Req", "number", "Total requirement from work orders and demand"),
-      c("On Hand", "number", "Stock on hand"),
-      c("On Order", "number", "Open supplier PO quantity (in-flight)"),
-      c("Net Short", "number", "Gross Req − On Hand − On Order"),
-      c("UOM", "enum", "EA, FT, M"),
-      c("Lead Time (days)", "number", "Item lead time"),
-      c("Buyer", "string", "Buyer code"),
-      c("MRP Message", "enum", "Order / Expedite / De-expedite / Cancel"),
-    ],
-    sampleRows: [
-      { "Item No": "RM-SMPL-0021", Description: "Connector, MIL-DTL-38999 type, shell 13", Plant: "BLR-P1", "Gross Req": 120, "On Hand": 46, "On Order": 40, "Net Short": 34, UOM: "EA", "Lead Time (days)": 84, Buyer: "BYR-01", "MRP Message": "Order" },
-      { "Item No": "RM-SMPL-0034", Description: "Contact, crimp socket, size 22", Plant: "BLR-P2", "Gross Req": 22000, "On Hand": 15000, "On Order": 5000, "Net Short": 2000, UOM: "EA", "Lead Time (days)": 56, Buyer: "BYR-02", "MRP Message": "Order" },
-      { "Item No": "RM-SMPL-0063", Description: "Loop clamp, cushioned, 3/8\"", Plant: "BLR-P1", "Gross Req": 400, "On Hand": 120, "On Order": 300, "Net Short": 0, UOM: "EA", "Lead Time (days)": 42, Buyer: "BYR-01", "MRP Message": "Expedite" },
-      { "Item No": "RM-SMPL-0070", Description: "Splice, AS81824 type, 22-18 AWG", Plant: "BLR-P1", "Gross Req": 900, "On Hand": 950, "On Order": 500, "Net Short": 0, UOM: "EA", "Lead Time (days)": 35, Buyer: "BYR-03", "MRP Message": "De-expedite" },
-      { "Item No": "RM-SMPL-0089", Description: "Fibre-optic terminus, multimode", Plant: "BLR-P1", "Gross Req": 60, "On Hand": 8, "On Order": 0, "Net Short": 52, UOM: "EA", "Lead Time (days)": 112, Buyer: "BYR-02", "MRP Message": "Order" },
-    ],
-    sources: ["WS"],
+    plainMeaning: "The ERP's exception list: for each item, how much is short (Total Exception) and how much is still left to order once open POs are counted. The buyer's to-do list each morning.",
+    basis: "rossell-file",
+    workbook: "Exception Report 15-10-2026 07.40.XLSX",
+    extractDate: "2026-10-15",
+    sheets: [exception],
+    sources: SRC,
   },
   {
     id: "exception-mab",
@@ -89,35 +414,19 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "input",
     what: "When quantity should arrive",
+    notes: "Adds required arrival timing to the material requirement.",
     sourceSystem: "IQMS ERP",
     mechanism: "Crystal Reports-SQL via ERP",
     trigger: "Stock updates",
     refresh: "Every morning",
     creates: "Feature in ERP",
     consumers: ["Buyer"],
-    plainMeaning: "The same shortages, but with a date: by when each quantity must physically arrive so the build that needs it can start on time.",
-    columns: [
-      c("Item No", "string", "RM number"),
-      c("Description", "string", "Material description"),
-      c("Plant", "string", "Rossell plant"),
-      c("Work Order", "string", "Work order that needs the material"),
-      c("FG / Wire Bundle", "string", "Finished good the WO builds"),
-      c("Qty Needed", "number", "Quantity short for this WO"),
-      c("UOM", "enum", "EA, FT, M"),
-      c("Need Date", "date", "WO start date the material is needed for"),
-      c("Must Arrive By", "date", "Need date minus receiving/inspection buffer"),
-      c("Open PO", "string", "Supplier PO covering it, if any"),
-      c("Promise Date", "date", "Supplier promise date (ETA)"),
-      c("Days Late", "number", "Promise Date − Must Arrive By (positive = late)"),
-    ],
-    sampleRows: [
-      { "Item No": "RM-SMPL-0021", Description: "Connector, 38999 type, shell 13", Plant: "BLR-P1", "Work Order": "WO-SMPL-50112", "FG / Wire Bundle": "001-0001-011", "Qty Needed": 8, UOM: "EA", "Need Date": "2026-12-01", "Must Arrive By": "2026-11-24", "Open PO": "PO-SMPL-77801", "Promise Date": "2026-12-05", "Days Late": 11 },
-      { "Item No": "RM-SMPL-0034", Description: "Contact, crimp socket, size 22", Plant: "BLR-P2", "Work Order": "WO-SMPL-50140", "FG / Wire Bundle": "002-0410-003", "Qty Needed": 2000, UOM: "EA", "Need Date": "2026-12-10", "Must Arrive By": "2026-12-03", "Open PO": "PO-SMPL-77822", "Promise Date": "2026-11-28", "Days Late": -5 },
-      { "Item No": "RM-SMPL-0089", Description: "Fibre-optic terminus, multimode", Plant: "BLR-P1", "Work Order": "WO-SMPL-50155", "FG / Wire Bundle": "001-0007-002", "Qty Needed": 52, UOM: "EA", "Need Date": "2027-01-12", "Must Arrive By": "2027-01-05", "Open PO": "", "Promise Date": "", "Days Late": 0 },
-      { "Item No": "RM-SMPL-0063", Description: "Loop clamp, cushioned, 3/8\"", Plant: "BLR-P1", "Work Order": "WO-SMPL-50112", "FG / Wire Bundle": "001-0001-011", "Qty Needed": 24, UOM: "EA", "Need Date": "2026-12-01", "Must Arrive By": "2026-11-24", "Open PO": "PO-SMPL-77790", "Promise Date": "2026-11-20", "Days Late": -4 },
-      { "Item No": "RM-SMPL-0007", Description: "Wire, M22759/16 type, 20 AWG", Plant: "BLR-P1", "Work Order": "WO-SMPL-50160", "FG / Wire Bundle": "003-0102-001", "Qty Needed": 1500, UOM: "FT", "Need Date": "2026-12-15", "Must Arrive By": "2026-12-08", "Open PO": "PO-SMPL-77830", "Promise Date": "2026-12-08", "Days Late": 0 },
-    ],
-    sources: ["WS"],
+    plainMeaning: "The same shortages as dated requirements: for each item and quantity, by when it must be ordered and by when it must arrive.",
+    basis: "rossell-file",
+    workbook: "Exception Report With Must Arrive By 15-10-2026 07.37.XLSX",
+    extractDate: "2026-10-15",
+    sheets: [mustArrive],
+    sources: SRC,
   },
   {
     id: "rt-consolidated-bom",
@@ -126,36 +435,19 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "input",
     what: "BOM – master",
+    notes: "Rossell engineering BOM master: finished-good / wire-bundle composition, component materials, quantities, UOM and revision information.",
     sourceSystem: "IQMS ERP",
     mechanism: "Crystal Reports-SQL via ERP",
     trigger: "New order / customer / revision",
     refresh: "Every morning",
     creates: "Feature in ERP",
     consumers: ["Engineering", "Buyer", "PPC", "Sourcing"],
-    plainMeaning: "The recipe book: for every finished good and plant, every raw material and how much of it goes into one unit, at a given BOM revision.",
-    columns: [
-      c("FG Part No", "string", "Finished good (e.g. wire bundle) number"),
-      c("FG Description", "string", "Finished good description"),
-      c("Plant", "string", "Rossell plant (BOM is per FG + plant, rule 2.1)"),
-      c("BOM Rev", "string", "Engineering revision"),
-      c("Effective From", "date", "Revision effective date (rule 2.2)"),
-      c("Line No", "number", "BOM line sequence"),
-      c("RM Item No", "string", "Rossell raw-material number"),
-      c("RM Description", "string", "Component description"),
-      c("OEM Part No (MPN)", "string", "Manufacturer part number behind the RM"),
-      c("Qty per FG", "number", "Quantity of this RM in one FG"),
-      c("UOM", "enum", "EA, FT, M"),
-      c("Approved Source", "string", "AML / approved manufacturer"),
-      c("Customer", "string", "Informational only: not part of BOM identity"),
-    ],
-    sampleRows: [
-      { "FG Part No": "001-0001-011", "FG Description": "Wire bundle (sample)", Plant: "BLR-P1", "BOM Rev": "C", "Effective From": "2026-10-01", "Line No": 1, "RM Item No": "Wire", "RM Description": "Wire", "OEM Part No (MPN)": "M22759/16-22-9 (example)", "Qty per FG": 200, UOM: "FT", "Approved Source": "Manufacturer A (sample)", Customer: "CUST-AERO-01" },
-      { "FG Part No": "001-0001-011", "FG Description": "Wire bundle (sample)", Plant: "BLR-P1", "BOM Rev": "C", "Effective From": "2026-10-01", "Line No": 2, "RM Item No": "Component A", "RM Description": "Component A", "OEM Part No (MPN)": "MPN-SAMPLE-A", "Qty per FG": 4000, UOM: "EA", "Approved Source": "Manufacturer B (sample)", Customer: "CUST-AERO-01" },
-      { "FG Part No": "001-0001-011", "FG Description": "Wire bundle (sample)", Plant: "BLR-P1", "BOM Rev": "C", "Effective From": "2026-10-01", "Line No": 3, "RM Item No": "Component B", "RM Description": "Component B", "OEM Part No (MPN)": "MPN-SAMPLE-B", "Qty per FG": 21500, UOM: "EA", "Approved Source": "Manufacturer C (sample)", Customer: "CUST-AERO-01" },
-      { "FG Part No": "001-0001-011", "FG Description": "Wire bundle (sample)", Plant: "BLR-P1", "BOM Rev": "C", "Effective From": "2026-10-01", "Line No": 4, "RM Item No": "Component C", "RM Description": "Component C", "OEM Part No (MPN)": "MPN-SAMPLE-C", "Qty per FG": 55000, UOM: "EA", "Approved Source": "Manufacturer A (sample)", Customer: "CUST-AERO-01" },
-      { "FG Part No": "001-0001-011", "FG Description": "Wire bundle (sample)", Plant: "BLR-P1", "BOM Rev": "C", "Effective From": "2026-10-01", "Line No": 15, "RM Item No": "RM-SMPL-0015", "RM Description": "Connector, 38999 type, shell 11", "OEM Part No (MPN)": "D38999/26WB35PN (example)", "Qty per FG": 2, UOM: "EA", "Approved Source": "Manufacturer D (sample)", Customer: "CUST-AERO-01" },
-    ],
-    sources: ["WS", "DECK-SC"],
+    plainMeaning: "The recipe book: for every wire bundle, each raw material and how much of it goes into one unit, with the latest and default revisions. It is engineering master data; customer demand never overwrites it.",
+    basis: "rossell-file",
+    workbook: "RT Consolidated BOM 15th Oct 2026.xlsx",
+    extractDate: "2026-10-15",
+    sheets: [consolidatedBom],
+    sources: SRC,
   },
   {
     id: "rt-open-order",
@@ -164,36 +456,19 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "input",
     what: "Pending orders",
+    notes: "ERP open supplier orders, including PO/release, supplier, quantity, required date, promise date and status.",
     sourceSystem: "IQMS ERP",
     mechanism: "Crystal Reports-SQL via ERP",
     trigger: "Daily",
     refresh: "Every morning",
     creates: "Feature in ERP",
     consumers: ["Buyer"],
-    plainMeaning: "Every customer order line not yet shipped: the firm demand. Aerospace shows one PO with many schedule lines; semiconductor shows many POs against one schedule.",
-    columns: [
-      c("Customer", "string", "Customer code"),
-      c("Domain", "enum", "Aerospace / Defence / Semiconductor / Space"),
-      c("Project", "string", "Project code"),
-      c("Customer PO", "string", "Customer purchase order number"),
-      c("PO Line", "number", "Line on the customer PO"),
-      c("Schedule Line", "number", "Delivery schedule under the PO line"),
-      c("FG Part No", "string", "Finished good ordered"),
-      c("Ordered Qty", "number", "Quantity on the schedule"),
-      c("Shipped Qty", "number", "Already shipped"),
-      c("Open Qty", "number", "Ordered − Shipped"),
-      c("Due Date", "date", "Requested delivery date"),
-      c("Unit Price", "number", "Price per FG (currency per PO)"),
-      c("Currency", "enum", "USD / INR / EUR"),
-    ],
-    sampleRows: [
-      { Customer: "CUST-AERO-01", Domain: "Aerospace", Project: "PRJ-SMPL-07", "Customer PO": "CPO-SMPL-4501", "PO Line": 1, "Schedule Line": 1, "FG Part No": "001-0001-011", "Ordered Qty": 200, "Shipped Qty": 200, "Open Qty": 0, "Due Date": "2026-01-31", "Unit Price": 1850, Currency: "USD" },
-      { Customer: "CUST-AERO-01", Domain: "Aerospace", Project: "PRJ-SMPL-07", "Customer PO": "CPO-SMPL-4501", "PO Line": 1, "Schedule Line": 2, "FG Part No": "001-0001-011", "Ordered Qty": 500, "Shipped Qty": 120, "Open Qty": 380, "Due Date": "2026-03-31", "Unit Price": 1850, Currency: "USD" },
-      { Customer: "CUST-AERO-01", Domain: "Aerospace", Project: "PRJ-SMPL-07", "Customer PO": "CPO-SMPL-4501", "PO Line": 1, "Schedule Line": 3, "FG Part No": "001-0001-011", "Ordered Qty": 300, "Shipped Qty": 0, "Open Qty": 300, "Due Date": "2026-06-30", "Unit Price": 1850, Currency: "USD" },
-      { Customer: "CUST-SEMI-01", Domain: "Semiconductor", Project: "", "Customer PO": "CPO-SMPL-9910", "PO Line": 1, "Schedule Line": 1, "FG Part No": "S-ASSY-SMPL-220", "Ordered Qty": 40, "Shipped Qty": 0, "Open Qty": 40, "Due Date": "2026-12-14", "Unit Price": 640, Currency: "USD" },
-      { Customer: "CUST-SEMI-01", Domain: "Semiconductor", Project: "", "Customer PO": "CPO-SMPL-9911", "PO Line": 1, "Schedule Line": 1, "FG Part No": "S-ASSY-SMPL-220", "Ordered Qty": 35, "Shipped Qty": 0, "Open Qty": 35, "Due Date": "2026-12-21", "Unit Price": 640, Currency: "USD" },
-    ],
-    sources: ["WS", "DECK-SC"],
+    plainMeaning: "Every open supplier purchase order line: what was ordered from whom, what has arrived, the balance still to come, the required date and the supplier's promise date. This is the in-flight supply that planning nets against demand.",
+    basis: "rossell-file",
+    workbook: "RT Open Order Report 15102026.xlsx",
+    extractDate: "2026-10-15",
+    sheets: [openOrderRaw, openOrderWorking, openOrderSummary],
+    sources: SRC,
   },
   {
     id: "reorder",
@@ -202,35 +477,19 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "output",
     what: "To reorder to supplier",
+    notes: "Output identifying what should be reordered from suppliers.",
     sourceSystem: "IT Team – SCM",
     mechanism: "Crystal Reports-SQL via ERP",
     trigger: "Weekly",
     refresh: "Weekly",
     creates: "Developed by IT",
     consumers: ["Buyer (semiconductor business)"],
-    plainMeaning: "Built in-house by IT for the semiconductor business: once a week, what to reorder from which supplier, and how much, so buyers can raise POs.",
-    columns: [
-      c("Item No", "string", "RM number"),
-      c("Description", "string", "Material description"),
-      c("Supplier", "string", "Preferred supplier"),
-      c("Net Requirement", "number", "Demand − in-flight − free stock"),
-      c("MOQ", "number", "Supplier minimum order quantity"),
-      c("Order Multiple", "number", "Pack / reel multiple"),
-      c("Suggested Qty", "number", "Net requirement rounded up to MOQ / multiple"),
-      c("UOM", "enum", "EA, FT, M"),
-      c("Lead Time (days)", "number", "Supplier lead time"),
-      c("Order By", "date", "Need date − lead time"),
-      c("Unit Cost", "number", "Last PO price"),
-      c("Ext. Value", "number", "Suggested Qty × Unit Cost"),
-    ],
-    sampleRows: [
-      { "Item No": "RM-SMPL-0034", Description: "Contact, crimp socket, size 22", Supplier: "Distributor A (sample)", "Net Requirement": 2000, MOQ: 1000, "Order Multiple": 500, "Suggested Qty": 2000, UOM: "EA", "Lead Time (days)": 56, "Order By": "2026-11-14", "Unit Cost": 0.42, "Ext. Value": 840 },
-      { "Item No": "RM-SMPL-0021", Description: "Connector, 38999 type, shell 13", Supplier: "Manufacturer D (sample)", "Net Requirement": 34, MOQ: 10, "Order Multiple": 1, "Suggested Qty": 34, UOM: "EA", "Lead Time (days)": 84, "Order By": "2026-11-12", "Unit Cost": 96.5, "Ext. Value": 3281 },
-      { "Item No": "RM-SMPL-0007", Description: "Wire, 20 AWG", Supplier: "Distributor B (sample)", "Net Requirement": 1320, MOQ: 1000, "Order Multiple": 500, "Suggested Qty": 1500, UOM: "FT", "Lead Time (days)": 28, "Order By": "2026-11-18", "Unit Cost": 0.31, "Ext. Value": 465 },
-      { "Item No": "RM-SMPL-0089", Description: "Fibre-optic terminus", Supplier: "Manufacturer E (sample)", "Net Requirement": 52, MOQ: 50, "Order Multiple": 10, "Suggested Qty": 60, UOM: "EA", "Lead Time (days)": 112, "Order By": "2026-09-15", "Unit Cost": 38, "Ext. Value": 2280 },
-      { "Item No": "RM-SMPL-0058", Description: "Braided sleeving, 1/2\"", Supplier: "Distributor A (sample)", "Net Requirement": 0, MOQ: 100, "Order Multiple": 100, "Suggested Qty": 0, UOM: "FT", "Lead Time (days)": 21, "Order By": "", "Unit Cost": 1.1, "Ext. Value": 0 },
-    ],
-    sources: ["WS"],
+    plainMeaning: "What to reorder from which supplier: per item, its demand, stock, reorder level and quantity, open orders, last buy price, a status flag and any pull-in. Buyers review it in a Working Sheet with extra columns.",
+    basis: "rossell-file",
+    workbook: "Reorder Order Report- 12-10-2026.xlsx",
+    extractDate: "2026-10-12",
+    sheets: [reorderRaw, reorderWorking],
+    sources: SRC,
   },
   {
     id: "forecast",
@@ -239,32 +498,17 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "input",
     what: "From customer",
+    notes: "Customer forecast. Eligible forecast is exploded through the applicable BOM into raw-material demand, subject to the configurable exclusion horizon.",
     sourceSystem: "Customer",
     mechanism: "Customer",
     trigger: "Changes from customer – daily",
     refresh: "15 days (daily)",
     creates: "Downloaded",
     consumers: ["Buyer", "Sourcing"],
-    plainMeaning: "The customer's own forecast file, downloaded from their portal. It changes every day for semiconductor customers. Labels are ignored and the whole quantity is used, but the first 2 months (6 for LAM) are excluded because they overlap firm orders.",
-    columns: [
-      c("Customer", "string", "Customer code"),
-      c("File Date", "date", "Date the forecast file was downloaded"),
-      c("Customer Part No", "string", "Customer's part number for the FG"),
-      c("FG Part No", "string", "Rossell FG number (mapped)"),
-      c("Bucket Start", "date", "Start of the forecast period (week / month)"),
-      c("Forecast Qty", "number", "Forecast quantity in the bucket"),
-      c("Label", "string", "Customer nomenclature (ignored in consolidation)"),
-      c("Months Out", "number", "Months from file date"),
-      c("In Exclusion Window", "boolean", "True if within the first 2 months (6 for LAM)"),
-    ],
-    sampleRows: [
-      { Customer: "CUST-SEMI-01", "File Date": "2026-11-10", "Customer Part No": "CPN-SMPL-8821", "FG Part No": "S-ASSY-SMPL-220", "Bucket Start": "2026-12-01", "Forecast Qty": 160, Label: "Firm-ish", "Months Out": 1, "In Exclusion Window": "true" },
-      { Customer: "CUST-SEMI-01", "File Date": "2026-11-10", "Customer Part No": "CPN-SMPL-8821", "FG Part No": "S-ASSY-SMPL-220", "Bucket Start": "2027-03-01", "Forecast Qty": 210, Label: "Plan", "Months Out": 4, "In Exclusion Window": "true" },
-      { Customer: "CUST-SEMI-01", "File Date": "2026-11-10", "Customer Part No": "CPN-SMPL-8821", "FG Part No": "S-ASSY-SMPL-220", "Bucket Start": "2027-06-01", "Forecast Qty": 260, Label: "Plan", "Months Out": 7, "In Exclusion Window": "false" },
-      { Customer: "CUST-SEMI-02", "File Date": "2026-11-10", "Customer Part No": "CPN-SMPL-1407", "FG Part No": "S-ASSY-SMPL-305", "Bucket Start": "2027-02-01", "Forecast Qty": 90, Label: "Upside", "Months Out": 3, "In Exclusion Window": "false" },
-      { Customer: "CUST-AERO-02", "File Date": "2026-11-09", "Customer Part No": "CPN-SMPL-0042", "FG Part No": "001-0007-002", "Bucket Start": "2027-04-01", "Forecast Qty": 24, Label: "LTA", "Months Out": 5, "In Exclusion Window": "false" },
-    ],
-    sources: ["WS", "DECK-SC"],
+    plainMeaning: "The customer's own forecast file, downloaded from their portal; it changes daily for semiconductor customers. Eligible forecast is exploded through the BOM into raw-material demand. The first months are excluded by a configurable horizon (for example 2 months, 6 for LAM) because they overlap firm orders.",
+    basis: "modelled",
+    sheets: [forecast],
+    sources: SRC,
   },
   {
     id: "sales-order",
@@ -273,71 +517,36 @@ export const files: DataFile[] = [
     status: "out-of-scope",
     direction: "input",
     what: "Customer order – demand – FG level",
+    notes: "Customer sales-order demand at finished-good level. Customer SO template includes order, PO revision, release/schedule, quantity, backlog, dates and shipment-related fields.",
     sourceSystem: "IQMS ERP",
     mechanism: "Crystal Reports-SQL via ERP",
     trigger: "Daily",
     refresh: "Every morning",
     creates: "Feature in ERP",
     consumers: [],
-    plainMeaning: "Customer orders summarised at finished-good level: what has been sold and when it is due. Not in scope now.",
-    columns: [
-      c("Sales Order", "string", "Internal sales order number"),
-      c("Customer", "string", "Customer code"),
-      c("Customer PO", "string", "Customer PO reference"),
-      c("FG Part No", "string", "Finished good"),
-      c("Order Qty", "number", "Quantity ordered"),
-      c("Open Qty", "number", "Not yet shipped"),
-      c("Promise Ship Date", "date", "Rossell's committed ship date"),
-      c("Order Value", "number", "Open value"),
-      c("Status", "enum", "Open / Partially shipped / Closed"),
-    ],
-    sampleRows: [
-      { "Sales Order": "SO-SMPL-30011", Customer: "CUST-AERO-01", "Customer PO": "CPO-SMPL-4501", "FG Part No": "001-0001-011", "Order Qty": 1000, "Open Qty": 680, "Promise Ship Date": "2026-12-20", "Order Value": 1258000, Status: "Partially shipped" },
-      { "Sales Order": "SO-SMPL-30012", Customer: "CUST-DEF-01", "Customer PO": "CPO-SMPL-6120", "FG Part No": "002-0410-003", "Order Qty": 60, "Open Qty": 60, "Promise Ship Date": "2027-01-15", "Order Value": 402000, Status: "Open" },
-      { "Sales Order": "SO-SMPL-30013", Customer: "CUST-SEMI-01", "Customer PO": "CPO-SMPL-9910", "FG Part No": "S-ASSY-SMPL-220", "Order Qty": 40, "Open Qty": 40, "Promise Ship Date": "2026-12-14", "Order Value": 25600, Status: "Open" },
-      { "Sales Order": "SO-SMPL-30014", Customer: "CUST-SPACE-01", "Customer PO": "CPO-SMPL-7001", "FG Part No": "SP-HRN-SMPL-01", "Order Qty": 12, "Open Qty": 4, "Promise Ship Date": "2026-11-30", "Order Value": 96000, Status: "Partially shipped" },
-      { "Sales Order": "SO-SMPL-30009", Customer: "CUST-AERO-02", "Customer PO": "CPO-SMPL-0420", "FG Part No": "001-0007-002", "Order Qty": 24, "Open Qty": 0, "Promise Ship Date": "2026-10-31", "Order Value": 0, Status: "Closed" },
-    ],
-    sources: ["WS"],
+    plainMeaning: "Customer orders at finished-good level: order, PO revision, release, blanket and backlog quantities, requested and promised dates, and shipments. Its template is a sheet in Rossell's Templates.xlsx. Not in scope now.",
+    basis: "modelled",
+    sheets: [salesOrder],
+    sources: SRC,
   },
   {
     id: "grn",
     index: 9,
     name: "GRN Report",
-    status: "in-scope",
+    status: "out-of-scope",
     direction: "input",
     what: "Goods received notes",
+    notes: "ERP goods-receipt information; may later support PO receipt and stock reconciliation.",
     sourceSystem: "IQMS ERP",
     mechanism: "Crystal Reports-SQL via ERP",
     trigger: "Daily",
     refresh: "Every morning",
     creates: "Feature in ERP",
     consumers: ["SCM (per research deck; consumer column blank in the sheet)"],
-    plainMeaning: "Every delivery received from suppliers: what arrived, against which PO, and whether quality accepted it. Accepted quantity leaves 'in-flight' and becomes stock at that moment.",
-    columns: [
-      c("GRN No", "string", "Goods received note number"),
-      c("GRN Date", "date", "Date received"),
-      c("Supplier", "string", "Supplier name / code"),
-      c("Supplier PO", "string", "PO the receipt is booked against"),
-      c("PO Line", "number", "PO line"),
-      c("Item No", "string", "RM number"),
-      c("Received Qty", "number", "Quantity received"),
-      c("Accepted Qty", "number", "Quantity accepted by incoming QA"),
-      c("Rejected Qty", "number", "Quantity rejected / on hold"),
-      c("UOM", "enum", "EA, FT, M"),
-      c("Lot No", "string", "Lot / batch"),
-      c("Date Code", "string", "Manufacturer date code"),
-      c("CoC Ref", "string", "Certificate of conformance reference"),
-      c("Plant", "string", "Receiving plant"),
-    ],
-    sampleRows: [
-      { "GRN No": "GRN-SMPL-91001", "GRN Date": "2026-11-06", Supplier: "Distributor A (sample)", "Supplier PO": "PO-SMPL-77822", "PO Line": 1, "Item No": "RM-SMPL-0034", "Received Qty": 3000, "Accepted Qty": 3000, "Rejected Qty": 0, UOM: "EA", "Lot No": "L-SAMPLE-2412", "Date Code": "2630", "CoC Ref": "COC-SMPL-5531", Plant: "BLR-P2" },
-      { "GRN No": "GRN-SMPL-91002", "GRN Date": "2026-11-06", Supplier: "Manufacturer D (sample)", "Supplier PO": "PO-SMPL-77750", "PO Line": 2, "Item No": "RM-SMPL-0045", "Received Qty": 30, "Accepted Qty": 0, "Rejected Qty": 30, UOM: "EA", "Lot No": "L-SAMPLE-2507", "Date Code": "2622", "CoC Ref": "COC-SMPL-5532", Plant: "BLR-P1" },
-      { "GRN No": "GRN-SMPL-91003", "GRN Date": "2026-11-07", Supplier: "Distributor B (sample)", "Supplier PO": "PO-SMPL-77801", "PO Line": 1, "Item No": "RM-SMPL-0021", "Received Qty": 20, "Accepted Qty": 20, "Rejected Qty": 0, UOM: "EA", "Lot No": "L-SAMPLE-2310", "Date Code": "2628", "CoC Ref": "COC-SMPL-5540", Plant: "BLR-P1" },
-      { "GRN No": "GRN-SMPL-91004", "GRN Date": "2026-11-07", Supplier: "Distributor A (sample)", "Supplier PO": "PO-SMPL-77830", "PO Line": 1, "Item No": "RM-SMPL-0007", "Received Qty": 1000, "Accepted Qty": 1000, "Rejected Qty": 0, UOM: "FT", "Lot No": "L-SAMPLE-2608", "Date Code": "2633", "CoC Ref": "COC-SMPL-5544", Plant: "BLR-P1" },
-      { "GRN No": "GRN-SMPL-91005", "GRN Date": "2026-11-08", Supplier: "Manufacturer F (sample)", "Supplier PO": "PO-SMPL-77812", "PO Line": 3, "Item No": "RM-SMPL-0063", "Received Qty": 300, "Accepted Qty": 296, "Rejected Qty": 4, UOM: "EA", "Lot No": "L-SAMPLE-2611", "Date Code": "2631", "CoC Ref": "COC-SMPL-5550", Plant: "BLR-P1" },
-    ],
-    sources: ["WS", "DECK-RESEARCH"],
+    plainMeaning: "Goods received against supplier POs. A receipt is an event, not available stock: posting, rejection, void and location status must be defined before it can reconcile stock. Its template is a sheet in Rossell's Templates.xlsx. Not in scope now.",
+    basis: "modelled",
+    sheets: [grn],
+    sources: [...SRC, "DECK-RESEARCH"],
   },
   {
     id: "sourcing",
@@ -346,30 +555,13 @@ export const files: DataFile[] = [
     status: "out-of-scope",
     direction: "input",
     what: "Source, price validity",
+    notes: "Supplier/source and price-validity information.",
     mechanism: "Future, not now (supplier master)",
     consumers: [],
     plainMeaning: "For each part: who we can buy it from, at what price, and until when that price holds. Planned for the future as part of a supplier master.",
-    columns: [
-      c("Item No", "string", "RM number"),
-      c("MPN", "string", "Manufacturer part number"),
-      c("Manufacturer", "string", "Approved manufacturer"),
-      c("Supplier", "string", "Supplier / distributor"),
-      c("Price", "number", "Agreed unit price"),
-      c("Currency", "enum", "USD / INR / EUR"),
-      c("Price Break Qty", "number", "Quantity the price applies from"),
-      c("Valid From", "date", "Price validity start"),
-      c("Valid To", "date", "Price validity end"),
-      c("Lead Time (days)", "number", "Quoted lead time"),
-      c("Source Type", "enum", "Manufacturer / Authorised distributor / Customer-directed"),
-    ],
-    sampleRows: [
-      { "Item No": "RM-SMPL-0021", MPN: "D38999/26WB35PN (example)", Manufacturer: "Manufacturer D (sample)", Supplier: "Distributor B (sample)", Price: 96.5, Currency: "USD", "Price Break Qty": 10, "Valid From": "2026-04-01", "Valid To": "2027-03-31", "Lead Time (days)": 84, "Source Type": "Authorised distributor" },
-      { "Item No": "RM-SMPL-0034", MPN: "M39029/56-348 (example)", Manufacturer: "Manufacturer A (sample)", Supplier: "Distributor A (sample)", Price: 0.42, Currency: "USD", "Price Break Qty": 1000, "Valid From": "2026-01-01", "Valid To": "2026-12-31", "Lead Time (days)": 56, "Source Type": "Authorised distributor" },
-      { "Item No": "RM-SMPL-0007", MPN: "M22759/16-20-9 (example)", Manufacturer: "Manufacturer G (sample)", Supplier: "Distributor B (sample)", Price: 0.31, Currency: "USD", "Price Break Qty": 1000, "Valid From": "2026-07-01", "Valid To": "2027-06-30", "Lead Time (days)": 28, "Source Type": "Authorised distributor" },
-      { "Item No": "RM-SMPL-0045", MPN: "M85049/38S15W (example)", Manufacturer: "Manufacturer D (sample)", Supplier: "Manufacturer D (sample)", Price: 41, Currency: "USD", "Price Break Qty": 5, "Valid From": "2026-04-01", "Valid To": "2027-03-31", "Lead Time (days)": 70, "Source Type": "Manufacturer" },
-      { "Item No": "RM-SMPL-0089", MPN: "M29504/14-4209 (example)", Manufacturer: "Manufacturer E (sample)", Supplier: "Manufacturer E (sample)", Price: 38, Currency: "USD", "Price Break Qty": 50, "Valid From": "2026-04-01", "Valid To": "2026-12-31", "Lead Time (days)": 112, "Source Type": "Customer-directed" },
-    ],
-    sources: ["WS"],
+    basis: "modelled",
+    sheets: [sourcing],
+    sources: SRC,
   },
   {
     id: "vendor-master",
@@ -378,30 +570,15 @@ export const files: DataFile[] = [
     status: "out-of-scope",
     direction: "input",
     what: "Approved supplier listing",
+    notes: "Approved supplier list / supplier master information.",
     sourceSystem: "IQMS ERP",
     mechanism: "Live report",
     trigger: "Live",
     consumers: [],
     plainMeaning: "The approved supplier list (ASL): every supplier Rossell is allowed to buy from, with its approval status and certifications.",
-    columns: [
-      c("Vendor Code", "string", "IQMS vendor ID"),
-      c("Vendor Name", "string", "Supplier name"),
-      c("Category", "enum", "Manufacturer / Distributor / Special process / Logistics / Service"),
-      c("Country", "string", "Supplier country"),
-      c("Approval Status", "enum", "Approved / Conditional / Disqualified"),
-      c("Certifications", "string", "AS9100 / AS9120 / ISO 9001 / NADCAP"),
-      c("Approved Since", "date", "First approval date"),
-      c("Next Audit", "date", "Next supplier audit due"),
-      c("Payment Terms", "string", "e.g. Net 60"),
-    ],
-    sampleRows: [
-      { "Vendor Code": "V-SMPL-001", "Vendor Name": "Distributor A (sample)", Category: "Distributor", Country: "USA", "Approval Status": "Approved", Certifications: "AS9120, ISO 9001", "Approved Since": "2016-05-01", "Next Audit": "2027-05-01", "Payment Terms": "Net 60" },
-      { "Vendor Code": "V-SMPL-002", "Vendor Name": "Distributor B (sample)", Category: "Distributor", Country: "India", "Approval Status": "Approved", Certifications: "AS9120", "Approved Since": "2019-02-11", "Next Audit": "2027-02-11", "Payment Terms": "Net 45" },
-      { "Vendor Code": "V-SMPL-003", "Vendor Name": "Manufacturer D (sample)", Category: "Manufacturer", Country: "USA", "Approval Status": "Approved", Certifications: "AS9100, ISO 9001", "Approved Since": "2014-09-20", "Next Audit": "2026-12-15", "Payment Terms": "Net 30" },
-      { "Vendor Code": "V-SMPL-004", "Vendor Name": "Plating House (sample)", Category: "Special process", Country: "India", "Approval Status": "Conditional", Certifications: "NADCAP (chemical processing)", "Approved Since": "2025-08-01", "Next Audit": "2026-12-01", "Payment Terms": "Net 30" },
-      { "Vendor Code": "V-SMPL-005", "Vendor Name": "Forwarder (sample)", Category: "Logistics", Country: "India", "Approval Status": "Approved", Certifications: "ISO 9001", "Approved Since": "2018-01-15", "Next Audit": "2027-01-15", "Payment Terms": "Net 15" },
-    ],
-    sources: ["WS"],
+    basis: "modelled",
+    sheets: [vendorMaster],
+    sources: SRC,
   },
   {
     id: "promise-date-upload",
@@ -410,31 +587,13 @@ export const files: DataFile[] = [
     status: "in-scope",
     direction: "output",
     what: "Upload into ERP",
+    notes: "Portal-generated ERP upload file for supplier promise dates. Must preserve the exact customer-provided template format.",
     mechanism: "Excel if API is not available",
     consumers: ["SCM", "Buyer (per research deck; consumer column blank in the sheet)"],
-    plainMeaning: "The sheet that carries suppliers' committed dates back into IQMS. Today dates arrive by email and are typed into Excel, then uploaded. The promise date becomes the ETA used by clear-to-build.",
-    columns: [
-      c("Supplier PO", "string", "Rossell PO number"),
-      c("PO Line", "number", "PO line"),
-      c("Release", "number", "Delivery release / schedule under the line"),
-      c("Item No", "string", "RM number"),
-      c("Supplier", "string", "Supplier name"),
-      c("Open Qty", "number", "Quantity not yet received"),
-      c("Need Date", "date", "Rossell's need date (may be buyer-overridden)"),
-      c("Promise Date", "date", "Supplier's committed date (ETA)"),
-      c("Promise Qty", "number", "Quantity committed for that date (partials allowed)"),
-      c("Change Type", "enum", "New / Pull-in / Push-out / Split"),
-      c("Source", "enum", "Email / Portal / Phone"),
-      c("Updated By", "string", "Buyer / SCM user"),
-    ],
-    sampleRows: [
-      { "Supplier PO": "PO-SMPL-77801", "PO Line": 1, Release: 1, "Item No": "RM-SMPL-0021", Supplier: "Distributor B (sample)", "Open Qty": 20, "Need Date": "2026-11-24", "Promise Date": "2026-12-05", "Promise Qty": 20, "Change Type": "Push-out", Source: "Email", "Updated By": "BYR-01" },
-      { "Supplier PO": "PO-SMPL-77822", "PO Line": 1, Release: 2, "Item No": "RM-SMPL-0034", Supplier: "Distributor A (sample)", "Open Qty": 2000, "Need Date": "2026-12-03", "Promise Date": "2026-11-28", "Promise Qty": 2000, "Change Type": "Pull-in", Source: "Email", "Updated By": "BYR-02" },
-      { "Supplier PO": "PO-SMPL-77830", "PO Line": 1, Release: 1, "Item No": "RM-SMPL-0007", Supplier: "Distributor A (sample)", "Open Qty": 500, "Need Date": "2026-12-08", "Promise Date": "2026-12-08", "Promise Qty": 500, "Change Type": "New", Source: "Portal", "Updated By": "SCM-04" },
-      { "Supplier PO": "PO-SMPL-77812", "PO Line": 3, Release: 1, "Item No": "RM-SMPL-0063", Supplier: "Manufacturer F (sample)", "Open Qty": 100, "Need Date": "2026-11-20", "Promise Date": "2026-11-20", "Promise Qty": 60, "Change Type": "Split", Source: "Phone", "Updated By": "BYR-01" },
-      { "Supplier PO": "PO-SMPL-77812", "PO Line": 3, Release: 2, "Item No": "RM-SMPL-0063", Supplier: "Manufacturer F (sample)", "Open Qty": 100, "Need Date": "2026-11-20", "Promise Date": "2026-12-18", "Promise Qty": 40, "Change Type": "Split", Source: "Phone", "Updated By": "BYR-01" },
-    ],
-    sources: ["WS", "DECK-RESEARCH"],
+    plainMeaning: "The file the planning portal generates to load supplier promise dates into IQMS, release by release (Unique Rel ID). It is an integration contract: exact column order, headers, blanks, types and date formats, no unresolved exceptions, and a history of every export. The promise date becomes the ETA used by clear-to-build.",
+    basis: "modelled",
+    sheets: [promiseUpload],
+    sources: [...SRC, "DECK-RESEARCH"],
   },
   {
     id: "open-order-mrp",
@@ -443,26 +602,12 @@ export const files: DataFile[] = [
     status: "out-of-scope",
     direction: "input",
     what: "Show new need dates",
+    notes: "Open-order report with MRP messages / new need dates.",
     consumers: [],
-    plainMeaning: "Open supplier POs with the ERP's advice attached: 'this is now needed earlier / later / not at all'. Not in scope now.",
-    columns: [
-      c("Supplier PO", "string", "Rossell PO number"),
-      c("PO Line", "number", "PO line"),
-      c("Item No", "string", "RM number"),
-      c("Open Qty", "number", "Not yet received"),
-      c("Current Due", "date", "Current due date on the PO"),
-      c("New Need Date", "date", "Date MRP now says it is needed"),
-      c("MRP Message", "enum", "Expedite / De-expedite / Cancel / OK"),
-      c("Days Shift", "number", "New Need − Current Due"),
-    ],
-    sampleRows: [
-      { "Supplier PO": "PO-SMPL-77801", "PO Line": 1, "Item No": "RM-SMPL-0021", "Open Qty": 20, "Current Due": "2026-12-05", "New Need Date": "2026-11-24", "MRP Message": "Expedite", "Days Shift": -11 },
-      { "Supplier PO": "PO-SMPL-77822", "PO Line": 1, "Item No": "RM-SMPL-0034", "Open Qty": 2000, "Current Due": "2026-11-28", "New Need Date": "2026-12-03", "MRP Message": "OK", "Days Shift": 5 },
-      { "Supplier PO": "PO-SMPL-77760", "PO Line": 2, "Item No": "RM-SMPL-0070", "Open Qty": 500, "Current Due": "2026-11-30", "New Need Date": "2027-02-15", "MRP Message": "De-expedite", "Days Shift": 77 },
-      { "Supplier PO": "PO-SMPL-77744", "PO Line": 1, "Item No": "RM-SMPL-0091", "Open Qty": 10, "Current Due": "2026-12-12", "New Need Date": "", "MRP Message": "Cancel", "Days Shift": 0 },
-      { "Supplier PO": "PO-SMPL-77830", "PO Line": 1, "Item No": "RM-SMPL-0007", "Open Qty": 500, "Current Due": "2026-12-08", "New Need Date": "2026-12-08", "MRP Message": "OK", "Days Shift": 0 },
-    ],
-    sources: ["WS"],
+    plainMeaning: "The open supplier POs with the ERP's advice attached: needed earlier, later or not at all. Not in scope now.",
+    basis: "modelled",
+    sheets: [openOrderMrp],
+    sources: SRC,
   },
   {
     id: "supplier-contact",
@@ -471,25 +616,12 @@ export const files: DataFile[] = [
     status: "not-available",
     direction: "input",
     what: "To send mail to suppliers",
+    notes: "Supplier contact details needed for supplier communications; not currently available.",
     consumers: [],
     plainMeaning: "Who to email at each supplier about dates and confirmations. To be provided by Rossell.",
-    columns: [
-      c("Vendor Code", "string", "IQMS vendor ID"),
-      c("Vendor Name", "string", "Supplier name"),
-      c("Contact Role", "enum", "Sales / Order desk / Expediting / Quality"),
-      c("Email", "string", "Contact email"),
-      c("Phone", "string", "Contact phone"),
-      c("Time Zone", "string", "Supplier time zone"),
-      c("Preferred Channel", "enum", "Email / Portal / Phone"),
-    ],
-    sampleRows: [
-      { "Vendor Code": "V-SMPL-001", "Vendor Name": "Distributor A (sample)", "Contact Role": "Order desk", Email: "orders@distributor-a.example", Phone: "+1-555-0100", "Time Zone": "America/Chicago", "Preferred Channel": "Email" },
-      { "Vendor Code": "V-SMPL-002", "Vendor Name": "Distributor B (sample)", "Contact Role": "Sales", Email: "sales@distributor-b.example", Phone: "+91-80-5550-0101", "Time Zone": "Asia/Kolkata", "Preferred Channel": "Portal" },
-      { "Vendor Code": "V-SMPL-003", "Vendor Name": "Manufacturer D (sample)", "Contact Role": "Expediting", Email: "expedite@manufacturer-d.example", Phone: "+1-555-0102", "Time Zone": "America/New_York", "Preferred Channel": "Email" },
-      { "Vendor Code": "V-SMPL-004", "Vendor Name": "Plating House (sample)", "Contact Role": "Quality", Email: "quality@plating.example", Phone: "+91-80-5550-0103", "Time Zone": "Asia/Kolkata", "Preferred Channel": "Phone" },
-      { "Vendor Code": "V-SMPL-006", "Vendor Name": "Manufacturer E (sample)", "Contact Role": "Order desk", Email: "orders@manufacturer-e.example", Phone: "+44-20-5550-0104", "Time Zone": "Europe/London", "Preferred Channel": "Email" },
-    ],
-    sources: ["WS"],
+    basis: "modelled",
+    sheets: [supplierContact],
+    sources: SRC,
   },
   {
     id: "user-details",
@@ -498,26 +630,12 @@ export const files: DataFile[] = [
     status: "not-available",
     direction: "input",
     what: "Internal users",
+    notes: "Rossell internal user information; not currently available.",
     consumers: [],
-    plainMeaning: "The list of Rossell people who will use the planning layer, with department and designation for access roles. To be provided by Rossell.",
-    columns: [
-      c("User ID", "string", "Login ID"),
-      c("Name", "string", "Display name"),
-      c("Department", "enum", "SCM / PPC / Engineering / Sourcing / IT / Finance …"),
-      c("Designation", "enum", "VP … Associate Engineer"),
-      c("Role", "enum", "Buyer / Planner / SCM / Viewer / Admin"),
-      c("Plant", "string", "Home plant"),
-      c("Projects", "string", "Projects the user can see"),
-      c("Active", "boolean", "Account active"),
-    ],
-    sampleRows: [
-      { "User ID": "u.sample01", Name: "Sample User 01", Department: "SCM", Designation: "Principal Engineer", Role: "Buyer", Plant: "BLR-P1", Projects: "PRJ-SMPL-07; PRJ-SMPL-11", Active: "true" },
-      { "User ID": "u.sample02", Name: "Sample User 02", Department: "PPC", Designation: "Manager", Role: "Planner", Plant: "BLR-P1", Projects: "All", Active: "true" },
-      { "User ID": "u.sample03", Name: "Sample User 03", Department: "SCM", Designation: "Senior Manager", Role: "SCM", Plant: "BLR-P2", Projects: "All", Active: "true" },
-      { "User ID": "u.sample04", Name: "Sample User 04", Department: "Engineering", Designation: "Engineer", Role: "Viewer", Plant: "BLR-P1", Projects: "PRJ-SMPL-07", Active: "true" },
-      { "User ID": "u.sample05", Name: "Sample User 05", Department: "IT Support", Designation: "Team Lead", Role: "Admin", Plant: "BLR-P1", Projects: "All", Active: "false" },
-    ],
-    sources: ["WS"],
+    plainMeaning: "The Rossell people who will use the planning layer, with department and designation for access roles. To be provided by Rossell.",
+    basis: "modelled",
+    sheets: [userDetails],
+    sources: SRC,
   },
   {
     id: "material-planner",
@@ -525,41 +643,45 @@ export const files: DataFile[] = [
     name: "Material Planner Report",
     status: "out-of-scope",
     direction: "input",
-    what: "Will have all the demands: ~3 lakh lines per project; 44 running projects",
+    what: "Will have all the demands: 3L lines per project; 44 running projects",
+    notes: "Material-planner report described as containing all demand; stated scale is “3L Lines per project” and 44 running projects. Not in scope. “3L” is not interpreted.",
+    sourceSystem: "IQMS ERP",
     consumers: [],
-    plainMeaning: "Every demand line for every project, exploded down to raw material: up to ~3 lakh rows per project across 44 projects. Not in scope now, but it shows the scale the planning layer must handle.",
-    columns: [
-      c("Project", "string", "Project code"),
-      c("Work Order", "string", "Work order"),
-      c("FG Part No", "string", "Finished good"),
-      c("BOM Rev", "string", "Revision used"),
-      c("Item No", "string", "RM number"),
-      c("Demand Type", "enum", "Firm / Forecast / Safety stock / Spares / FAI"),
-      c("Demand Qty", "number", "Required quantity"),
-      c("Need Date", "date", "Date needed"),
-      c("Allocated Qty", "number", "Hard-allocated quantity"),
-      c("Shortage", "number", "Demand − allocated − free stock"),
-      c("Plant", "string", "Plant"),
-    ],
-    sampleRows: [
-      { Project: "PRJ-SMPL-07", "Work Order": "WO-SMPL-50112", "FG Part No": "001-0001-011", "BOM Rev": "C", "Item No": "RM-SMPL-0021", "Demand Type": "Firm", "Demand Qty": 16, "Need Date": "2026-12-01", "Allocated Qty": 8, Shortage: 8, Plant: "BLR-P1" },
-      { Project: "PRJ-SMPL-07", "Work Order": "WO-SMPL-50112", "FG Part No": "001-0001-011", "BOM Rev": "C", "Item No": "RM-SMPL-0005", "Demand Type": "Firm", "Demand Qty": 1600, "Need Date": "2026-12-01", "Allocated Qty": 1600, Shortage: 0, Plant: "BLR-P1" },
-      { Project: "PRJ-SMPL-11", "Work Order": "WO-SMPL-50140", "FG Part No": "002-0410-003", "BOM Rev": "A", "Item No": "RM-SMPL-0034", "Demand Type": "Firm", "Demand Qty": 6400, "Need Date": "2026-12-10", "Allocated Qty": 4400, Shortage: 2000, Plant: "BLR-P2" },
-      { Project: "PRJ-SMPL-SEMI", "Work Order": "", "FG Part No": "S-ASSY-SMPL-220", "BOM Rev": "B", "Item No": "RM-SMPL-0058", "Demand Type": "Forecast", "Demand Qty": 520, "Need Date": "2027-06-01", "Allocated Qty": 0, Shortage: 0, Plant: "BLR-P1" },
-      { Project: "PRJ-SMPL-07", "Work Order": "", "FG Part No": "001-0001-011", "BOM Rev": "C", "Item No": "RM-SMPL-0089", "Demand Type": "Safety stock", "Demand Qty": 20, "Need Date": "2027-01-05", "Allocated Qty": 0, Shortage: 20, Plant: "BLR-P1" },
-    ],
-    sources: ["WS"],
+    plainMeaning: "IQMS's material planner view: per item and project, the requirement, hard allocation, stock by bucket (stores, pan stock, kitting, inward QC), deficiency, reorder point and the next scheduled delivery. Described as holding all demand, “3L lines per project” across 44 running projects (what 3L means is still open, Q23). Not in scope now.",
+    basis: "rossell-file",
+    workbook: "IQMS Material Planner 15-10-2026 07.37.xlsx",
+    extractDate: "2026-10-15",
+    sheets: [materialPlanner],
+    sources: SRC,
   },
 ];
+
+/** Every column of a file, across its sheets, once each (pivot sheets excluded), in sheet order. */
+export function fileColumns(f: DataFile): FileColumn[] {
+  const seen = new Set<string>();
+  const out: FileColumn[] = [];
+  for (const s of f.sheets) {
+    if (s.pivot) continue;
+    for (const col of s.columns) {
+      if (seen.has(col.name)) continue;
+      seen.add(col.name);
+      out.push(col);
+    }
+  }
+  return out;
+}
+
+/** The sheet(s) of a file that hold a column. */
+export const sheetsWithColumn = (f: DataFile, name: string) => f.sheets.filter((s) => !s.pivot && s.columns.some((col) => col.name === name)).map((s) => s.name);
 
 export const fileSummary = {
   inScope: files.filter((f) => f.status === "in-scope").map((f) => f.id),
   outOfScope: files.filter((f) => f.status === "out-of-scope").map((f) => f.id),
   notAvailable: files.filter((f) => f.status === "not-available").map((f) => f.id),
-  text: "16 reports: 9 in scope (7 inputs, 2 outputs), 5 not in scope now, 2 to be provided by Rossell.",
-  sources: ["WS"],
+  text: "16 reports: 8 in scope (6 inputs, 2 outputs), 6 not in scope, 2 not yet available.",
+  sources: SRC,
   confidence: "session" as const,
-  sampleNote: "Column layouts and sample rows are our template design; values are invented samples, not Rossell data.",
+  sampleNote: "Column names of the seven reports Rossell sent are exactly as in their files; the other nine are our model. Every sample value is invented, not Rossell data.",
 };
 
 export const getFile = (id: string): DataFile | undefined => files.find((f) => f.id === id);

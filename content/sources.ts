@@ -119,6 +119,14 @@ export const internalSources: Source[] = [
     group: "internal",
   },
   {
+    id: "FILES",
+    title: "RossellTechSys File Catalogue & Business Meaning (working reference: availability, direction, scope and meaning of the 16 reports) and Rossell's column-clarification workbooks for seven reports (column names, meanings, review priorities, questions and answers)",
+    publisher: "Project team with Rossell (column sheets from Rossell, extracts dated 12 and 15 Oct 2026)",
+    date: "Nov 2026",
+    accessed: "12 Nov 2026",
+    group: "internal",
+  },
+  {
     id: "RULES",
     title: "Engineering, BOM and Demand Processing — Business Rules & Logical Design (§1–§12: BOM identity, revisions, upload, consolidation, customer mapping, demand sources, forecast exclusion, consolidation, net demand, auditability), working design specification",
     publisher: "Project team",

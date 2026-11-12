@@ -96,13 +96,50 @@ export interface Client {
   confidence: Confidence;
 }
 
+/** Answer cells in Rossell's column sheets ("Data Availability", "To be stored", "To be generated"). */
+export type ColumnFlag = "yes" | "no" | "not-sure" | "maybe";
+
+export interface FileColumn {
+  /** Header exactly as in Rossell's file (their spelling kept), or our modelled name. */
+  name: string;
+  /** "Full Column Name" from Rossell's sheet, when it differs from the header. */
+  full?: string;
+  /** string | number | date | enum | boolean: our reading of the column. */
+  type: string;
+  description: string;
+  /** The sheet says nobody yet knows what the column means. */
+  unclear?: boolean;
+  /** "Needs Review" row: Must Review / Good to Review. */
+  review?: "must" | "good";
+  /** Clarification question raised with Rossell. */
+  question?: string;
+  /** Rossell's answer ("Your Comments" row). */
+  answer?: string;
+  available?: ColumnFlag;
+  stored?: ColumnFlag;
+  generated?: ColumnFlag;
+}
+
+export interface FileSheet {
+  name: string;
+  columns: FileColumn[];
+  /** SAMPLE data, invented and labelled as such in the UI. Never values from Rossell's files. */
+  sampleRows: Record<string, string | number>[];
+  note?: string;
+  /** A summary pivot (row labels × periods), not a list of records: kept out of the column crosswalk. */
+  pivot?: boolean;
+}
+
 export interface DataFile {
   id: string; // "active-stock"
   index: number; // 1..16
   name: string;
   status: "in-scope" | "out-of-scope" | "not-available";
   direction: "input" | "output";
+  /** "Meaning" column of the file catalogue. */
   what: string;
+  /** "Notes / Interpretation" column of the file catalogue. */
+  notes: string;
   sourceSystem?: string;
   mechanism?: string;
   trigger?: string;
@@ -110,9 +147,20 @@ export interface DataFile {
   creates?: string;
   consumers: string[];
   plainMeaning: string;
-  columns: { name: string; type: string; description: string }[];
-  sampleRows: Record<string, string | number>[]; // SAMPLE data, labelled as such in UI
+  /** rossell-file: column names come from Rossell's own workbook; modelled: our layout until the file arrives. */
+  basis: "rossell-file" | "modelled";
+  /** Rossell's workbook name and extract date, for rossell-file entries. */
+  workbook?: string;
+  extractDate?: string;
+  /** One or more sheets; the first is the main one. */
+  sheets: FileSheet[];
   sources: string[];
+}
+
+/** One exact column in one file (and sheet) that carries a dictionary field. */
+export interface ColumnRef {
+  file: string; // DataFile id
+  column: string; // exact header
 }
 
 export interface DictionaryEntry {
@@ -121,6 +169,11 @@ export interface DictionaryEntry {
   type: string;
   definition: string;
   example?: string;
+  /** Every column, across the files, that holds this field (the crosswalk). */
+  columns: ColumnRef[];
+  /** Files that carry the field: the columns' files plus modelled links. */
   files: string[]; // DataFile ids
   usedBy: string[];
+  /** rossell-file when at least one column comes from a Rossell workbook. */
+  basis: "rossell-file" | "modelled";
 }

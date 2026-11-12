@@ -4,20 +4,24 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { DataFile } from "@/content/types";
 import { files } from "@/content/files";
 import { Chip, Cite, ConfidenceTag, DetailOverlay, KeyValueRows, Marker } from "@/components/ui-rt";
+import { ColumnList } from "./ColumnList";
 import { SheetTemplate } from "./SheetTemplate";
-import { STATUS_LABEL, STATUS_MARKER, consumerCaveat, entitiesForFile, entityColor, pad2 } from "./shared";
+import { BASIS_LABEL, STATUS_LABEL, STATUS_MARKER, consumerCaveat, entitiesForFile, entityColor, fileStats, pad2, shortDate } from "./shared";
 
 /** Large overlay for one report: template view, plain meaning, what/when/who, columns explained, entities fed. Pages through all 16. */
 export function FileOverlay({
   index,
   onIndexChange,
   onEntity,
+  onField,
 }: {
   /** 0-based position in `files`, or null when closed. */
   index: number | null;
   onIndexChange: (i: number | null) => void;
   /** Jump to the data dictionary filtered to an entity. */
   onEntity: (entity: string) => void;
+  /** Open one dictionary field. */
+  onField?: (fieldId: string) => void;
 }) {
   const file: DataFile | undefined = index === null ? undefined : files[index];
   const n = files.length;
@@ -35,22 +39,48 @@ export function FileOverlay({
       onPrev={() => index !== null && onIndexChange((index - 1 + n) % n)}
       onNext={() => index !== null && onIndexChange((index + 1) % n)}
     >
-      {file && <FileDetail file={file} onEntity={onEntity} />}
+      {file && <FileDetail key={file.id} file={file} onEntity={onEntity} onField={onField} />}
     </DetailOverlay>
   );
 }
 
-export function FileDetail({ file, onEntity }: { file: DataFile; onEntity: (entity: string) => void }) {
+/** The non-zero counts after "must review", in reading order. */
+function sheetFacts(s: ReturnType<typeof fileStats>) {
+  return [
+    s.questions && `${s.questions} open question${s.questions === 1 ? "" : "s"}`,
+    s.answered && `${s.answered} answered by Rossell`,
+    s.unclear && `${s.unclear} whose meaning nobody has confirmed yet`,
+    s.generated && `${s.generated} the planning layer will generate`,
+  ].filter((x): x is string => !!x);
+}
+
+export function FileDetail({ file, onEntity, onField }: { file: DataFile; onEntity: (entity: string) => void; onField?: (fieldId: string) => void }) {
   const m = STATUS_MARKER[file.status];
   const fed = entitiesForFile(file.id);
   const caveat = consumerCaveat(file);
+  const fromRossell = file.basis === "rossell-file";
+  const s = fileStats(file);
   return (
-    <div className="flex min-w-0 flex-col gap-12">
-      <div className="flex flex-wrap items-center gap-2">
-        <Chip marker={<Marker tone={m.tone} shape={m.shape} size={8} />}>{STATUS_LABEL[file.status]}</Chip>
-        <Chip icon={file.direction === "input" ? <ArrowDownLeft /> : <ArrowUpRight />}>{file.direction === "input" ? "Input to planning" : "Output from planning"}</Chip>
-        <Cite ids={file.sources} />
-        <ConfidenceTag confidence="session" />
+    <div className="@container flex min-w-0 flex-col gap-12">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Chip marker={<Marker tone={m.tone} shape={m.shape} size={8} />}>{STATUS_LABEL[file.status]}</Chip>
+          <Chip icon={file.direction === "input" ? <ArrowDownLeft /> : <ArrowUpRight />}>{file.direction === "input" ? "Input to planning" : "Output from planning"}</Chip>
+          <Chip dashed={!fromRossell} marker={<Marker tone={fromRossell ? "primary" : "past"} shape={fromRossell ? "dot" : "hollow"} size={8} />}>
+            {fromRossell ? BASIS_LABEL["rossell-file"] : "Our model · awaiting Rossell's file"}
+          </Chip>
+          <Cite ids={file.sources} />
+          <ConfidenceTag confidence="session" />
+        </div>
+        {fromRossell ? (
+          <p className="max-w-3xl t-body-md text-body">
+            Columns from Rossell&apos;s workbook <span className="t-mono-sm [overflow-wrap:anywhere] text-on-surface">{file.workbook}</span>
+            {file.extractDate && <> (extract {shortDate(file.extractDate)})</>}: {s.columns} columns, <span className="text-on-surface">{s.must} must review</span>
+            {sheetFacts(s).map((t) => `, ${t}`).join("")}.
+          </p>
+        ) : (
+          <p className="max-w-3xl t-body-md text-body">Rossell has not sent this file yet. The columns below are our model of what it holds, to be replaced by Rossell&apos;s own column names.</p>
+        )}
       </div>
 
       <section aria-label="Template view" className="min-w-0">
@@ -61,12 +91,13 @@ export function FileDetail({ file, onEntity }: { file: DataFile; onEntity: (enti
         <SheetTemplate file={file} />
       </section>
 
-      <div className="grid grid-cols-1 min-w-0 gap-12 md:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-12 @2xl:grid-cols-2">
         <section aria-label="What, when, who">
           <h3 className="mb-2 t-label-caps text-muted">What · when · who</h3>
           <KeyValueRows
             rows={[
-              { label: "Holds", value: file.what },
+              { label: "Meaning", value: file.what },
+              { label: "Catalogue note", value: file.notes },
               { label: "Source system", value: file.sourceSystem },
               { label: "Produced by", value: file.mechanism },
               { label: "Triggered by", value: file.trigger },
@@ -83,7 +114,7 @@ export function FileDetail({ file, onEntity }: { file: DataFile; onEntity: (enti
           {fed.length ? (
             <ul className="flex flex-wrap gap-2">
               {fed.map(({ entity, fields }) => (
-                <li key={entity}>
+                <li key={entity} className="max-w-full min-w-0">
                   <Chip marker={entityColor(entity)} count={fields.length} onClick={() => onEntity(entity)} title={`Show ${entity} fields in the dictionary`}>
                     {entity}
                   </Chip>
@@ -98,16 +129,8 @@ export function FileDetail({ file, onEntity }: { file: DataFile; onEntity: (enti
       </div>
 
       <section aria-label="Columns explained" className="min-w-0">
-        <h3 className="mb-2 t-label-caps text-muted">Columns explained</h3>
-        <div className="divide-y divide-border">
-          {file.columns.map((c) => (
-            <div key={c.name} className="grid grid-cols-1 gap-x-4 gap-y-1 py-3 sm:grid-cols-[200px_88px_1fr]">
-              <span className="t-body-md text-on-surface">{c.name}</span>
-              <span className="col-start-2 t-mono-sm text-muted sm:col-start-auto">{c.type}</span>
-              <span className="col-start-2 t-body-md text-body sm:col-start-auto">{c.description}</span>
-            </div>
-          ))}
-        </div>
+        <h3 className="mb-4 t-label-caps text-muted">Columns explained</h3>
+        <ColumnList file={file} onField={onField} />
       </section>
     </div>
   );

@@ -35,6 +35,14 @@ const EDGES: Edge[] = [
   { from: "promise-date-upload", to: "iqms", kind: "loop" },
 ];
 
+/** One line under each in-scope file (FILES catalogue meaning, sharpened where the label misleads). */
+const FLOW_META: Record<string, string> = {
+  "rt-open-order": "Open supplier POs",
+  reorder: "What to reorder · weekly",
+  "promise-date-upload": "Portal-generated · exact ERP template",
+};
+const flowMeta = (f: (typeof inScope)[number]) => FLOW_META[f.id] ?? f.what;
+
 const reportsPerTeam = (c: string) => inScope.filter((f) => consumerKeys(f).includes(c as (typeof CONSUMERS)[number])).length;
 
 /** Flow: IQMS ERP → Crystal Reports (each morning) → in-scope files → teams; the two outputs flow back. Hover a node to trace it. */
@@ -100,7 +108,7 @@ export function ReportFlow({ onOpenFile }: { onOpenFile: (fileId: string) => voi
   return (
     <ChartFrame
       title="How the reports flow"
-      subtitle="Read left to right: IQMS produces the reports each morning, five teams read them, and two outputs flow back into IQMS. Hover any box to trace it."
+      subtitle="Read left to right: IQMS produces the reports each morning, five teams read them, and two outputs go back: reorders to the buyers and promise dates into IQMS, as a file the planning portal generates. Hover any box to trace it."
       footer={
         <>
           <span className="inline-flex items-center gap-2 t-body-md text-body">
@@ -115,8 +123,8 @@ export function ReportFlow({ onOpenFile }: { onOpenFile: (fileId: string) => voi
             </svg>
             Loops back into IQMS
           </span>
-          <span className="ml-auto inline-flex items-center gap-2">
-            <Cite ids={["WS", "DECK-RESEARCH"]} />
+          <span className="inline-flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto">
+            <Cite ids={["FILES", "WS", "DECK-RESEARCH"]} />
             <ConfidenceTag confidence="session" />
           </span>
         </>
@@ -172,6 +180,7 @@ export function ReportFlow({ onOpenFile }: { onOpenFile: (fileId: string) => voi
                 icon={<FileInput />}
                 type={`${pad2(f.index)} · In`}
                 title={f.name}
+                meta={flowMeta(f)}
                 onClick={() => onOpenFile(f.id)}
                 compact
               />
@@ -188,6 +197,7 @@ export function ReportFlow({ onOpenFile }: { onOpenFile: (fileId: string) => voi
                 icon={<FileOutput />}
                 type={`${pad2(f.index)} · Out`}
                 title={f.name}
+                meta={flowMeta(f)}
                 onClick={() => onOpenFile(f.id)}
                 compact
               />

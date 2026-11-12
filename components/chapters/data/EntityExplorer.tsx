@@ -4,7 +4,7 @@ import * as React from "react";
 import { ArrowRight } from "lucide-react";
 import { dataDictionary, dictionaryNote, entityGroupOf, entityMap } from "@/content/dataDictionary";
 import { getFile } from "@/content/files";
-import { Button, Chip, Cite, ConfidenceTag } from "@/components/ui-rt";
+import { Button, Chip, Cite, ConfidenceTag, Marker } from "@/components/ui-rt";
 import { EntityMap } from "./EntityMap";
 import { entityColor, pad2 } from "./shared";
 
@@ -16,8 +16,9 @@ export function EntityExplorer({ onShowNode, onShowEntity }: { onShowNode: (node
   const rows = node
     ? node.entities.map((e) => {
         const fields = dataDictionary.filter((d) => d.entity === e);
-        const fileIds = [...new Set(fields.flatMap((d) => d.files))];
-        return { e, n: fields.length, fileIds };
+        const fileIds = [...new Set(fields.flatMap((d) => d.files))].sort((a, b) => (getFile(a)?.index ?? 0) - (getFile(b)?.index ?? 0));
+        const byFile = fileIds.map((id) => ({ id, columns: [...new Set(fields.flatMap((d) => d.columns.filter((c) => c.file === id).map((c) => c.column)))] }));
+        return { e, n: fields.length, byFile };
       })
     : [];
   const total = rows.reduce((s, r) => s + r.n, 0);
@@ -26,7 +27,7 @@ export function EntityExplorer({ onShowNode, onShowEntity }: { onShowNode: (node
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <p className="mb-4 t-body-md text-muted">Select a step in the chain to see the entities it holds and the reports that carry them.</p>
+        <p className="mb-4 t-body-md text-muted">Select a step in the chain to see the entities it holds, the reports that carry them and the exact column names. A solid marker means the step appears in Rossell&apos;s own column sheets; a hollow one, only in our model.</p>
         <EntityMap selected={selected} onSelect={setSelected} />
       </div>
 
@@ -45,7 +46,9 @@ export function EntityExplorer({ onShowNode, onShowEntity }: { onShowNode: (node
               )}
             </div>
             <Button variant="secondary" size="sm" onClick={() => onShowNode(node.id)} icon={<ArrowRight aria-hidden />}>
-              Show {total} fields in the dictionary
+              <span>
+                Show {total} fields<span className="hidden sm:inline"> in the dictionary</span>
+              </span>
             </Button>
           </div>
           <ul className="mt-6 divide-y divide-border border-t border-border">
@@ -56,14 +59,26 @@ export function EntityExplorer({ onShowNode, onShowEntity }: { onShowNode: (node
                     {r.e}
                   </Chip>
                 </span>
-                <span className="t-body-sm text-body">
-                  {r.fileIds.length ? (
-                    <>
-                      <span className="text-muted">Carried by </span>
-                      {r.fileIds.map((id) => `${pad2(getFile(id)?.index ?? 0)} ${getFile(id)?.name ?? id}`).join(" · ")}
-                    </>
+                <span className="flex min-w-0 flex-col gap-1.5 t-body-sm text-body">
+                  {r.byFile.length ? (
+                    r.byFile.map(({ id, columns }) => {
+                      const f = getFile(id);
+                      const fromRossell = f?.basis === "rossell-file";
+                      return (
+                        <span key={id} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                          <span className="inline-flex items-center gap-1.5 text-on-surface">
+                            <Marker tone={fromRossell ? "primary" : "past"} shape={fromRossell ? "dot" : "hollow"} size={8} />
+                            <span className="t-mono-sm text-muted">{pad2(f?.index ?? 0)}</span> {f?.name ?? id}
+                          </span>
+                          <span className="min-w-0 t-mono-sm text-muted">
+                            {columns.slice(0, 6).join(" · ")}
+                            {columns.length > 6 ? ` +${columns.length - 6}` : ""}
+                          </span>
+                        </span>
+                      );
+                    })
                   ) : (
-                    <span className="text-muted">Not carried by any of the sixteen reports yet</span>
+                    <span className="text-muted">Our model: not carried by any of the sixteen reports yet</span>
                   )}
                 </span>
               </li>

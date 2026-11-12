@@ -160,9 +160,9 @@ export const chapters = [
     label: "Files & data dictionary",
     rail: "Files & data",
     act: "runs",
-    teaser: "Sixteen reports feed the planning floor. We have mapped every one.",
+    teaser: "Sixteen reports feed the planning floor. Seven arrived as Rossell's own column sheets.",
     figure: { value: "16", unit: "files", label: "Each with a template view" },
-    covers: ["Files", "Template view", "Data dictionary"],
+    covers: ["Files", "Template view", "Data dictionary", "Column names", "Clarification questions"],
     takeaway: "Sixteen files and one shared vocabulary describe everything planning needs to know.",
   },
   {

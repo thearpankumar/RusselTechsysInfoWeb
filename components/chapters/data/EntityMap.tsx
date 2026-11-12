@@ -2,13 +2,19 @@
 
 import * as React from "react";
 import { dataDictionary, entityGroupOf, entityMap } from "@/content/dataDictionary";
+import { getFile } from "@/content/files";
 import { dataBg } from "@/lib/dataColors";
+import { Marker } from "@/components/ui-rt";
 import { cn } from "@/lib/utils";
 import { entityColor } from "./shared";
 
 const NODE_H = 96;
 
 const fieldCount = (entities: string[]) => dataDictionary.filter((d) => entities.includes(d.entity)).length;
+
+/** Columns in Rossell's own sheets that carry a node's entities (0 = our model only). */
+const rossellColumns = (entities: string[]) =>
+  dataDictionary.filter((d) => entities.includes(d.entity)).reduce((sum, d) => sum + d.columns.filter((c) => getFile(c.file)?.basis === "rossell-file").length, 0);
 
 /** Entity relationship mini-map: the Customer → … → Invoice chain as workflow-node cards on a dot grid, laid out as a snake. */
 export function EntityMap({ selected, onSelect }: { selected: string | null; onSelect: (nodeId: string | null) => void }) {
@@ -91,7 +97,7 @@ export function EntityMap({ selected, onSelect }: { selected: string | null; onS
                     type="button"
                     aria-pressed={active}
                     onClick={() => onSelect(active ? null : n.id)}
-                    title={next && n.next ? `${n.label} ${n.next} ${next.label}` : n.label}
+                    title={`${next && n.next ? `${n.label} ${n.next} ${next.label}` : n.label} · ${fieldCount(n.entities)} fields${rossellColumns(n.entities) ? `, ${rossellColumns(n.entities)} columns in Rossell's sheets` : ", our model only"}`}
                     className={cn(
                       "relative flex size-full cursor-pointer flex-col justify-center overflow-hidden rounded-md border bg-surface py-3 pr-3 pl-4 text-left transition-colors duration-150 ease-out",
                       active ? "border-primary bg-surface-raised" : "border-border hover:border-chart-past hover:bg-surface-raised",
@@ -103,9 +109,11 @@ export function EntityMap({ selected, onSelect }: { selected: string | null; onS
                       {group?.label ?? "Entity"}
                     </span>
                     <span className="mt-1 truncate t-body-md text-on-surface">{n.label}</span>
-                    <span className="mt-1 truncate t-body-sm text-muted">
-                      {fieldCount(n.entities)} fields
-                      {n.entities.length > 1 ? ` · ${n.entities.length} entities` : ""}
+                    <span className="mt-1 flex min-w-0 items-center gap-1.5 t-body-sm text-muted">
+                      <Marker tone={rossellColumns(n.entities) ? "primary" : "past"} shape={rossellColumns(n.entities) ? "dot" : "hollow"} size={8} />
+                      <span className="truncate">
+                        {rossellColumns(n.entities) ? `${rossellColumns(n.entities)} columns` : "Our model"}
+                      </span>
                     </span>
                     {next && n.next && <span className="sr-only">{`, ${n.next} ${next.label}`}</span>}
                   </button>
