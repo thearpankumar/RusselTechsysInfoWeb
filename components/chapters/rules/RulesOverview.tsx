@@ -15,7 +15,7 @@ const contextCounts = Object.fromEntries(RULE_CONTEXT_ORDER.map((c) => [c, ruleR
 const maxContext = Math.max(...Object.values(contextCounts));
 const flagged = ruleRegister.filter(needsConfirmation).length;
 
-const FILTER_KEYS = ["q", "status", "ctx", "sec", "str", "origin", "owner", "flag", "question"] as const;
+const FILTER_KEYS = ["q", "status", "state", "ctx", "sec", "str", "origin", "owner", "flag", "question", "changed"] as const;
 
 /** True when the filters are exactly `patch` (sort and as-of ignored). */
 function isPreset(q: RuleQuery, patch: Partial<RuleQuery>): boolean {
@@ -40,9 +40,9 @@ export function RulesOverview({
   return (
     <div className="flex flex-col gap-12">
       <StatRow>
-        <Stat label="In the register" value={ruleRegister.length} unit="rules" caption="Spec and working sessions" sub="Every rule agreed so far" selected={isPreset(query, {})} onClick={() => onPreset({})} />
-        <Stat label="Active" value={active} unit="rules" caption={`In force on ${when}`} sub="Started, not yet retired" selected={isPreset(query, { status: ["active"] })} onClick={() => onPreset({ status: ["active"] })} />
-        <Stat label="Inactive" value={ruleRegister.length - active} unit="rules" caption="Retired or not yet effective" sub="Kept with the dates they applied" selected={isPreset(query, { status: ["inactive"] })} onClick={() => onPreset({ status: ["inactive"] })} />
+        <Stat label="In the register" value={ruleRegister.length} unit="rules" caption="Spec and working sessions" sub="Every rule recorded so far" selected={isPreset(query, {})} onClick={() => onPreset({})} />
+        <Stat label="Active" value={active} unit="rules" caption={`In force on ${when}`} sub="Approved and in force" selected={isPreset(query, { status: ["active"] })} onClick={() => onPreset({ status: ["active"] })} />
+        <Stat label="Inactive" value={ruleRegister.length - active} unit="rules" caption="In draft, review or replaced" sub="Kept with their full state history" selected={isPreset(query, { status: ["inactive"] })} onClick={() => onPreset({ status: ["inactive"] })} />
         <Stat label="Needs confirmation" value={flagged} unit="rules" caption="Wait on an open question" sub="Confirm with Rossell's teams" selected={isPreset(query, { flag: true })} onClick={() => onPreset({ flag: true })} />
       </StatRow>
 
@@ -72,7 +72,7 @@ export function RulesOverview({
                   <span aria-hidden className="block h-1 w-full rounded-full bg-chart-past/50">
                     <span className={cn("block h-1 rounded-full", dataBg[meta.colour])} style={{ width: `${(contextCounts[c] / maxContext) * 100}%` }} />
                   </span>
-                  <span className="line-clamp-2 t-body-sm text-muted">{meta.blurb}</span>
+                  <span className="t-body-sm text-muted">{meta.blurb}</span>
                 </button>
               </li>
             );
@@ -83,8 +83,9 @@ export function RulesOverview({
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 rounded-lg border border-dashed border-border p-6">
         <SampleTag />
         <p className="min-w-0 flex-1 basis-80 t-body-md text-body">
-          Each rule is quoted as written in the business-rules specification or the working-session notes. Its status period, contexts and owner are
-          illustrative until Rossell confirms them; status is worked out from the period, so it always matches the dates shown.
+          Spec rules are quoted as written in the business-rules specification; session rules as recorded in the working-session notes. Each
+          rule&apos;s state history (draft, review, approval, activation, replacement), contexts and owner are illustrative until Rossell confirms
+          them. Active or Inactive is worked out from that history, so it always matches the dates shown.
         </p>
         <span className="inline-flex items-center gap-2">
           <ConfidenceTag confidence="rules" />

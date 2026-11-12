@@ -172,8 +172,8 @@ export const chapters = [
     rail: "Business rules",
     act: "runs",
     teaser: "Every rule in one register: what applies, to what, and since when.",
-    figure: { value: "118", unit: "rules", label: "With status, period and context" },
-    covers: ["Business rules", "Rule register", "Active rules", "Inactive rules", "Effective dates", "Context", "Supplier order", "Contractor"],
+    figure: { value: "122", unit: "rules", label: "With state history, status and context" },
+    covers: ["Business rules", "Rule register", "Active rules", "Inactive rules", "State history", "Effective dates", "Context", "Supplier order", "Contractor", "Excel download"],
     takeaway: "Most rules can switch on as written; the open questions decide the few that cannot, and every rule keeps the dates it applied.",
   },
   {

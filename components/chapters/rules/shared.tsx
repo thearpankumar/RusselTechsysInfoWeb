@@ -1,12 +1,12 @@
 "use client";
 
-// Small pieces shared by the business-rules register views (table, cards, timeline, overlay).
+// Small pieces shared by the business-rules register views (table, cards, timeline, panel).
 import * as React from "react";
 import type { RuleContext, RuleRecord } from "@/content/types-extra";
 import { RULE_CONTEXTS, REGISTER_AS_OF } from "@/content/rules";
 import { Marker } from "@/components/ui-rt";
 import { dataBg } from "@/lib/dataColors";
-import { dayNumber, formatDate, pendingQuestions, ruleState, todayISO, type RuleState } from "@/lib/rules";
+import { STATE_LABEL, changeBetween, isActive, pendingQuestions, ruleStateAt, statusLine, todayISO, type RuleStateValue } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
 const noop = () => () => {};
@@ -16,24 +16,64 @@ export function useToday(): string {
   return React.useSyncExternalStore(noop, todayISO, () => REGISTER_AS_OF);
 }
 
-/** Why a rule is or is not active on `asOf`, in one line. */
-export function stateReason(r: RuleRecord, state: RuleState): string {
-  if (state === "scheduled") return `Not yet effective · from ${formatDate(r.activeFrom)}`;
-  if (state === "retired") return `Retired ${formatDate(r.activeTo!)}${r.supersededBy ? ` · replaced by ${r.supersededBy}` : ""}`;
-  return r.activeTo ? `Until ${formatDate(r.activeTo)}` : `Since ${formatDate(r.activeFrom)}`;
+/**
+ * Lifecycle marker: shape and fill, never hue (DESIGN.md). Active = solid highlighted dot; approved = solid grey;
+ * under review = dashed ring; draft = dotted ring; suspended = hollow square; retired / superseded = hollow ring (ended).
+ */
+export function StateMarker({ state, className }: { state: RuleStateValue; className?: string }) {
+  const base = "inline-block size-2.5 shrink-0";
+  switch (state) {
+    case "active":
+      return <span aria-hidden className={cn(base, "rounded-full bg-primary", className)} />;
+    case "approved":
+      return <span aria-hidden className={cn(base, "rounded-full bg-chart-mid", className)} />;
+    case "review":
+      return <span aria-hidden className={cn(base, "rounded-full border border-dashed border-chart-light", className)} />;
+    case "draft":
+      return <span aria-hidden className={cn(base, "rounded-full border border-dotted border-chart-mid", className)} />;
+    case "suspended":
+      return <span aria-hidden className={cn(base, "rounded-[2px] border border-chart-mid", className)} />;
+    case "retired":
+    case "superseded":
+      return <span aria-hidden className={cn(base, "rounded-full border border-chart-mid", className)} />;
+    default:
+      return <span aria-hidden className={cn(base, "flex items-center", className)}><span className="h-px w-full bg-chart-mid" /></span>;
+  }
 }
 
-/** Status marker + label (shape, never colour alone): solid = active, hollow = inactive. */
-export function StatusLabel({ rule, asOf, withReason, className }: { rule: RuleRecord; asOf: string; withReason?: boolean; className?: string }) {
-  const state = ruleState(rule, asOf);
-  const active = state === "active";
+/** Status on `asOf`: marker + Active / Inactive (+ the lifecycle state when inactive), then the period or reason. */
+export function StatusLabel({ rule, asOf, withLine = true, extra, className }: { rule: RuleRecord; asOf: string; withLine?: boolean; extra?: React.ReactNode; className?: string }) {
+  const state = ruleStateAt(rule, asOf);
+  const active = isActive(rule, asOf);
   return (
     <span className={cn("inline-flex min-w-0 flex-col gap-1", className)}>
       <span className={cn("inline-flex items-center gap-2 t-body-md", active ? "text-on-surface" : "text-body")}>
-        <Marker tone={active ? "primary" : "mid"} shape={active ? "dot" : "hollow"} size={8} />
+        <StateMarker state={state} />
         {active ? "Active" : "Inactive"}
+        {!active && <span className="text-muted">· {STATE_LABEL[state]}</span>}
       </span>
-      {withReason && <span className="t-body-sm text-muted">{stateReason(rule, state)}</span>}
+      {withLine && (
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="t-body-sm text-muted">{statusLine(rule, asOf)}</span>
+          {extra}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** "Under review → Active" between the compare date and the as-of date. */
+export function ChangeTag({ rule, vs, asOf, className }: { rule: RuleRecord; vs: string; asOf: string; className?: string }) {
+  const c = changeBetween(rule, vs, asOf);
+  if (!c) return null;
+  return (
+    <span className={cn("inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-chart-past bg-surface-raised px-2 t-mono-sm whitespace-nowrap text-on-surface", className)}>
+      <StateMarker state={c.from} className="size-2" />
+      <span className="truncate">{STATE_LABEL[c.from]}</span>
+      <span aria-hidden className="text-muted">→</span>
+      <span className="sr-only">to</span>
+      <StateMarker state={c.to} className="size-2" />
+      <span className="truncate">{STATE_LABEL[c.to]}</span>
     </span>
   );
 }
@@ -45,27 +85,27 @@ export function ConfirmFlag({ rule, compact, className }: { rule: RuleRecord; co
   return (
     <span className={cn("inline-flex items-center gap-2 t-body-sm text-body", className)} title={`Waits on open question ${qs.join(", ")}`}>
       <Marker shape="hatch" size={8} />
-      {compact ? qs.join(" · ") : `Needs confirmation · ${qs.join(" · ")}`}
+      {compact ? (
+        <>
+          <span className="sr-only">Needs confirmation:</span>
+          {qs.join(" · ")}
+        </>
+      ) : (
+        `Needs confirmation · ${qs.join(" · ")}`
+      )}
     </span>
   );
 }
 
 /** Context dot + label. `size="sm"` is the dense row form. */
-export function ContextTag({ ctx, size = "sm", className }: { ctx: RuleContext; size?: "sm" | "md"; className?: string }) {
+export function ContextTag({ ctx, tokens = [], size = "sm", className }: { ctx: RuleContext; tokens?: string[]; size?: "sm" | "md"; className?: string }) {
   const c = RULE_CONTEXTS[ctx];
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-2 text-body", size === "sm" ? "t-body-sm" : "t-body-md", className)}>
       <span aria-hidden className={cn("size-2 shrink-0 rounded-full", dataBg[c.colour])} />
-      <span className="truncate">{c.label}</span>
-    </span>
-  );
-}
-
-/** Active period as text: "3 Aug 2026 → open". */
-export function PeriodText({ rule, className }: { rule: RuleRecord; className?: string }) {
-  return (
-    <span className={cn("t-mono-sm whitespace-nowrap text-body tnum", className)}>
-      {formatDate(rule.activeFrom)} → {rule.activeTo ? formatDate(rule.activeTo) : <span className="text-muted">open</span>}
+      <span className="truncate">
+        <Highlight text={c.label} tokens={tokens} />
+      </span>
     </span>
   );
 }
@@ -76,25 +116,6 @@ export interface Domain {
 }
 
 export const pct = (day: number, d: Domain) => Math.min(100, Math.max(0, ((day - d.start) / (d.end - d.start)) * 100));
-
-/**
- * Mini validity strip on the register's shared axis: highlighted bar while active on `asOf`, grey otherwise;
- * open-ended periods fade into a dashed tail; a thin tick marks the as-of date. Decorative (dates are in text beside it).
- */
-export function PeriodStrip({ rule, asOf, domain, className }: { rule: RuleRecord; asOf: string; domain: Domain; className?: string }) {
-  const active = ruleState(rule, asOf) === "active";
-  const from = pct(dayNumber(rule.activeFrom), domain);
-  const to = rule.activeTo ? pct(dayNumber(rule.activeTo), domain) : null;
-  const solidEnd = to ?? Math.max(from, 92);
-  return (
-    <span aria-hidden className={cn("relative block h-3 w-full", className)}>
-      <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
-      <span className={cn("absolute top-1/2 h-1 -translate-y-1/2 rounded-full", active ? "bg-primary" : "bg-chart-past")} style={{ left: `${from}%`, width: `${Math.max(solidEnd - from, 1.5)}%` }} />
-      {to === null && <span className={cn("absolute top-1/2 -translate-y-1/2 border-t border-dashed", active ? "border-primary" : "border-chart-past")} style={{ left: `${solidEnd}%`, right: 0 }} />}
-      <span className="absolute top-0 h-3 w-px bg-muted" style={{ left: `${pct(dayNumber(asOf), domain)}%` }} />
-    </span>
-  );
-}
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -118,15 +139,49 @@ export function Highlight({ text, tokens }: { text: string; tokens: string[] }) 
   );
 }
 
-/** Dashed "Sample" tag for illustrative metadata (status periods, contexts, owners). */
+/** Dashed "Sample" tag for illustrative metadata (state histories, contexts, owners). */
 export function SampleTag({ className, children = "Sample metadata" }: { className?: string; children?: React.ReactNode }) {
   return (
     <span
-      title="Status periods, contexts and owners are illustrative until Rossell confirms them."
-      className={cn("inline-flex h-6 shrink-0 items-center gap-2 rounded-full border border-dashed border-chart-mid px-2 t-mono-sm whitespace-nowrap text-muted", className)}
+      title="State histories, contexts and owners are illustrative until Rossell confirms them."
+      className={cn("inline-flex h-6 shrink-0 items-center rounded-full border border-dashed border-chart-mid px-2 t-mono-sm whitespace-nowrap text-muted", className)}
     >
-      <Marker shape="hatch" size={8} />
       {children}
     </span>
   );
 }
+
+/** Lifecycle legend (marker + label), for the timeline and the panel's history. */
+export function StateLegend({ className }: { className?: string }) {
+  const states: RuleStateValue[] = ["draft", "review", "approved", "active", "suspended", "superseded"];
+  return (
+    <ul className={cn("flex flex-wrap items-center gap-x-5 gap-y-2", className)} aria-label="Lifecycle states">
+      {states.map((s) => (
+        <li key={s} className="inline-flex items-center gap-2 t-body-sm text-body">
+          <StateMarker state={s} />
+          {s === "superseded" ? "Retired or superseded" : STATE_LABEL[s]}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** True while the element's content is wider than the element (it scrolls sideways). */
+export function useOverflowX<T extends HTMLElement>(ref: React.RefObject<T | null>): boolean {
+  const [over, setOver] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // ResizeObserver also fires once right after observe(), which sets the initial value.
+    const ro = new ResizeObserver(() => setOver(el.scrollWidth > el.clientWidth + 1));
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [ref]);
+  return over;
+}
+
+/** Keep ←/→ inside a sideways scroller (they scroll it) instead of switching chapter. */
+export const keepArrows = (e: React.KeyboardEvent) => {
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") e.stopPropagation();
+};

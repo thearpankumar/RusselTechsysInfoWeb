@@ -144,7 +144,7 @@ export const businessRules: BusinessRule[] = [
   { id: "R2.1.5", group: "2.1 BOM identity", text: "The same finished good may have separate BOM definitions for different plants.", sources: ["RULES", "INFO"], confidence: "rules" },
   // 2.2
   { id: "R2.2.1", group: "2.2 BOM revision", text: "Each BOM can have multiple engineering revisions over time.", sources: ["RULES", "INFO"], confidence: "rules" },
-  { id: "R2.2.2", group: "2.2 BOM revision", text: "The latest successfully validated and accepted revision is the current accepted revision.", sources: ["RULES", "INFO"], confidence: "rules" },
+  { id: "R2.2.2", group: "2.2 BOM revision", text: "The latest successfully validated and accepted revision is considered the current accepted revision.", sources: ["RULES", "INFO"], confidence: "rules" },
   { id: "R2.2.3", group: "2.2 BOM revision", text: "The current accepted revision must remain in the main/current BOM tables.", sources: ["RULES", "INFO"], confidence: "rules" },
   { id: "R2.2.4", group: "2.2 BOM revision", text: "Effective dates must be retained for every accepted revision.", sources: ["RULES", "INFO"], confidence: "rules" },
   { id: "R2.2.5", group: "2.2 BOM revision", text: "The revision applicable to a planning date must be resolved using its effective dates.", sources: ["RULES", "INFO"], confidence: "rules" },
@@ -153,7 +153,7 @@ export const businessRules: BusinessRule[] = [
   { id: "R2.2.8", group: "2.2 BOM revision", text: "Historical component records must remain associated with their original revision.", sources: ["RULES", "INFO"], confidence: "rules" },
   { id: "R2.2.9", group: "2.2 BOM revision", text: "A planning run must retain the exact BOM revision used for its calculations.", sources: ["RULES", "INFO"], confidence: "rules" },
   // Net demand
-  { id: "RND.1", group: "Net demand & supply", text: "Net Demand = Consolidated Demand − In-flight Supply.", sources: ["RULES", "INFO"], confidence: "rules" },
+  { id: "RND.1", group: "Net demand & supply", text: "Net Demand = Consolidated Demand − In-flight Supply", sources: ["RULES", "INFO"], confidence: "rules" },
   { id: "RND.2", group: "Net demand & supply", text: "In-flight supply includes open purchase orders and in-transit supply.", sources: ["RULES", "INFO"], confidence: "rules" },
   { id: "RND.3", group: "Net demand & supply", text: "Material already received must be reflected in inventory.", sources: ["RULES", "INFO"], confidence: "rules" },
   { id: "RND.4", group: "Net demand & supply", text: "Received material must not be counted again as in-flight supply.", plain: "At GRN acceptance a quantity leaves 'in-flight' and enters 'inventory' at the same moment.", sources: ["RULES", "INFO"], confidence: "rules" },

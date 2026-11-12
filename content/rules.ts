@@ -2,10 +2,14 @@
 // Rule text: the business-rules specification (source RULES, §1–§12) and the working sessions (source WS).
 // Rules the Operations chapter already shows keep their text in content/lifecycle.ts and are pulled in by id.
 //
-// SAMPLE: activeFrom / activeTo, contexts and owners are illustrative until Rossell confirms them.
-// Change the dates in SAMPLE_PERIODS (one place) and the per-rule `ctx` / `owner` below.
+// Spec rules are quoted as written (statements that end in a list keep the list items verbatim in `list`);
+// session rules are as recorded in the session notes.
+//
+// SAMPLE: each rule's dated state history (draft → review → approved → active → …), its contexts and owner are
+// illustrative until Rossell confirms them. Change the batch histories in SAMPLE_HISTORY (one place) and the
+// per-rule `ctx` / `owner` / `pending` / `supersede` below. Active/Inactive is always derived from the history.
 import type { DataColor } from "@/lib/dataColors";
-import type { RuleContext, RuleOrigin, RuleRecord, RuleStrength } from "./types-extra";
+import type { RuleContext, RuleLifecycle, RuleOrigin, RuleRecord, RuleStateChange, RuleStrength } from "./types-extra";
 import { businessRules } from "./lifecycle";
 import { openQuestions } from "./openQuestions";
 
@@ -13,14 +17,14 @@ import { openQuestions } from "./openQuestions";
 
 /** What a rule applies to. Colours follow DESIGN.md order and stay the same everywhere. */
 export const RULE_CONTEXTS: Record<RuleContext, { label: string; colour: DataColor; blurb: string }> = {
-  "engineering-bom": { label: "Engineering BOM", colour: "sage", blurb: "Rossell's own bill of materials per finished good and plant, and its revisions." },
-  "customer-submission": { label: "Customer submission", colour: "slate", blurb: "Customer BOMs, files and part-number mapping to Rossell materials." },
-  "customer-order": { label: "Customer order", colour: "tan", blurb: "Firm customer demand: ERP open orders, past-due and remaining quantities." },
-  "customer-forecast": { label: "Customer forecast", colour: "lavender", blurb: "Forecast files from customers, their versions and the exclusion horizon." },
-  "supplier-order": { label: "Supplier order", colour: "olive", blurb: "Purchase orders, in-transit supply, promise dates and VMI stock." },
-  contractor: { label: "Contractor", colour: "teal", blurb: "Work and material out with subcontractors (special processes, job work)." },
+  "engineering-bom": { label: "Engineering BOM", colour: "sage", blurb: "Rossell's BOM per finished good and plant, and its revisions." },
+  "customer-submission": { label: "Customer submission", colour: "slate", blurb: "Customer files, BOMs and part-number mapping." },
+  "customer-order": { label: "Customer order", colour: "tan", blurb: "Firm demand: ERP open orders and past-due quantities." },
+  "customer-forecast": { label: "Customer forecast", colour: "lavender", blurb: "Forecast files, their versions and the exclusion horizon." },
+  "supplier-order": { label: "Supplier order", colour: "olive", blurb: "Purchase orders, in-transit supply, promise dates, VMI." },
+  contractor: { label: "Contractor", colour: "teal", blurb: "Work and material out with subcontractors." },
   "inventory-allocation": { label: "Inventory & allocation", colour: "rose", blurb: "Stock on hand, kitting and allocation to work orders." },
-  "planning-run": { label: "Planning run", colour: "moss", blurb: "Demand consolidation, forecast explosion and net-demand runs." },
+  "planning-run": { label: "Planning run", colour: "moss", blurb: "Consolidation, forecast explosion and net-demand runs." },
 };
 
 export const RULE_CONTEXT_ORDER = Object.keys(RULE_CONTEXTS) as RuleContext[];
@@ -39,21 +43,50 @@ export const RULE_ORIGINS: Record<RuleOrigin, { label: string }> = {
   session: { label: "Working session" },
 };
 
-/** SAMPLE effective dates, one per agreement batch. Replace with confirmed dates. */
-export const SAMPLE_PERIODS = {
-  /** §2.1, §2.2 and §7 agreed first. */
-  specV1: "2026-08-03",
-  /** Working-session rules (forecast, promise dates, buyer controls, allocation). */
-  sessions: "2026-09-14",
-  /** §1 and §2.3–§4: upload, consolidation, customer mapping, demand sources. */
-  specV2: "2026-10-12",
-  /** §5, §6, §8, §9, §12: forecast exclusion, consolidation, design, auditability (date of the RULES draft). */
-  specV3: "2026-11-07",
-  /** Rules whose core waits on an open question: scheduled for after the confirmation session. */
-  pending: "2027-01-04",
-} as const;
+/** Lifecycle states in their usual order. Only "active" counts as Active. */
+export const RULE_STATES: Record<RuleLifecycle, { label: string; blurb: string }> = {
+  draft: { label: "Draft", blurb: "Written down, not yet reviewed." },
+  review: { label: "Under review", blurb: "Being checked with Rossell's teams." },
+  approved: { label: "Approved", blurb: "Agreed, waiting for its start date." },
+  active: { label: "Active", blurb: "In force." },
+  suspended: { label: "Suspended", blurb: "Paused; may come back." },
+  retired: { label: "Retired", blurb: "No longer applies." },
+  superseded: { label: "Superseded", blurb: "Replaced by another rule." },
+};
+export const RULE_STATE_ORDER = Object.keys(RULE_STATES) as RuleLifecycle[];
 
-type Batch = Exclude<keyof typeof SAMPLE_PERIODS, "pending">;
+/** SAMPLE state histories, one per agreement batch. Replace with confirmed dates. */
+export const SAMPLE_HISTORY = {
+  /** §2.1, §2.2 and §7, agreed first. */
+  specV1: [
+    { state: "draft", from: "2026-07-06" },
+    { state: "review", from: "2026-07-20" },
+    { state: "approved", from: "2026-07-29" },
+    { state: "active", from: "2026-08-03" },
+  ],
+  /** Working-session rules (forecast, promise dates, buyer controls, allocation). */
+  sessions: [
+    { state: "draft", from: "2026-09-07", note: "Recorded in the working sessions." },
+    { state: "approved", from: "2026-09-11" },
+    { state: "active", from: "2026-09-14" },
+  ],
+  /** §1 and §2.3–§4: upload, consolidation, customer mapping, demand sources. */
+  specV2: [
+    { state: "draft", from: "2026-09-21" },
+    { state: "review", from: "2026-10-01" },
+    { state: "approved", from: "2026-10-08" },
+    { state: "active", from: "2026-10-12" },
+  ],
+  /** §5, §6, §8–§10, §12: forecast exclusion, consolidation, design, auditability (RULES draft of 7 Nov 2026). */
+  specV3: [
+    { state: "draft", from: "2026-10-19" },
+    { state: "review", from: "2026-10-28" },
+    { state: "approved", from: "2026-11-04" },
+    { state: "active", from: "2026-11-07" },
+  ],
+} satisfies Record<string, RuleStateChange[]>;
+
+type Batch = keyof typeof SAMPLE_HISTORY;
 
 export interface RuleSection {
   /** "2.3", "WS-A". */
@@ -81,6 +114,7 @@ export const RULE_SECTIONS: RuleSection[] = [
   { id: "7", label: "Net demand and supply", part: "Consolidation and net demand", batch: "specV1" },
   { id: "8", label: "Demand processing design", part: "Design and audit", batch: "specV3" },
   { id: "9", label: "Auditability and reproducibility", part: "Design and audit", batch: "specV3" },
+  { id: "10", label: "Logical entity inventory", part: "Design and audit", batch: "specV3" },
   { id: "12", label: "Implementation boundary", part: "Design and audit", batch: "specV3" },
   { id: "WS-F", label: "Forecast handling", part: "Working sessions", batch: "sessions" },
   { id: "WS-D", label: "Promise dates", part: "Working sessions", batch: "sessions" },
@@ -107,13 +141,15 @@ type Meta = {
   entities?: string[];
   q?: string[];
   plain?: string;
-  /** Override the section's batch date. */
-  from?: string;
-  to?: string;
-  supersededBy?: string;
+  /** Items the statement lists, verbatim. */
+  list?: string[];
+  /** Core still waits on an open question: drafted and under review, not approved yet. */
+  pending?: boolean;
+  /** Replaced by another rule on a date. */
+  supersede?: { on: string; by: string; note?: string };
 };
 
-type Draft = Omit<RuleRecord, "order" | "activeFrom"> & { activeFrom?: string };
+type Draft = Omit<RuleRecord, "order" | "history" | "activeFrom" | "activeTo"> & { meta: Meta };
 
 const legacyById = new Map(businessRules.map((r) => [r.id, r]));
 
@@ -122,6 +158,7 @@ const spec = (section: string, id: string, text: string, m: Meta): Draft => ({
   id,
   section,
   text,
+  list: m.list,
   plain: m.plain,
   title: m.title,
   contexts: m.ctx,
@@ -130,11 +167,10 @@ const spec = (section: string, id: string, text: string, m: Meta): Draft => ({
   origin: "spec",
   entities: m.entities,
   questions: m.q,
-  activeFrom: m.from,
-  activeTo: m.to,
-  supersededBy: m.supersededBy,
+  supersededBy: m.supersede?.by,
   sources: ["RULES"],
   confidence: "rules",
+  meta: m,
 });
 
 /** A rule already in content/lifecycle.ts (shown in Operations): text, sources and confidence come from there. */
@@ -145,6 +181,7 @@ const known = (section: string, id: string, m: Meta): Draft => {
     id,
     section,
     text: r.text,
+    list: m.list,
     plain: m.plain ?? r.plain,
     title: m.title,
     contexts: m.ctx,
@@ -153,21 +190,50 @@ const known = (section: string, id: string, m: Meta): Draft => {
     origin: r.confidence === "session" ? "session" : "spec",
     entities: m.entities,
     questions: m.q,
-    activeFrom: m.from,
-    activeTo: m.to,
-    supersededBy: m.supersededBy,
+    supersededBy: m.supersede?.by,
     sources: r.sources,
     confidence: r.confidence,
     note: r.note,
+    meta: m,
   };
 };
 
-const P = SAMPLE_PERIODS;
+/** History from the section's batch, cut short for pending rules and extended for superseded ones. */
+function historyFor(d: Draft): RuleStateChange[] {
+  const batch = sectionById.get(d.section)?.batch ?? "specV3";
+  const base = SAMPLE_HISTORY[batch].map((h) => ({ ...h }) as RuleStateChange);
+  if (d.meta.pending) {
+    const kept = base.filter((h) => h.state === "draft" || h.state === "review");
+    // Session batches have no review step: open one when the rule was recorded.
+    if (!kept.some((h) => h.state === "review")) kept.push({ state: "review", from: kept[0].from });
+    const last = kept.length - 1;
+    kept[last] = { ...kept[last], note: `Waits on ${(d.questions ?? []).join(", ")}.` };
+    return kept;
+  }
+  if (d.meta.supersede) base.push({ state: "superseded", from: d.meta.supersede.on, note: d.meta.supersede.note ?? `Replaced by ${d.meta.supersede.by}.` });
+  return base;
+}
+
+/** First active date, and the end of the last active span (if it has ended). */
+function activeSpan(history: RuleStateChange[]): { activeFrom?: string; activeTo?: string } {
+  const first = history.findIndex((h) => h.state === "active");
+  if (first < 0) return {};
+  let last = first;
+  history.forEach((h, i) => {
+    if (h.state === "active") last = i;
+  });
+  return { activeFrom: history[first].from, activeTo: history[last + 1]?.from };
+}
 
 const drafts: Draft[] = [
   // §1 Business domain overview
-  spec("1", "R1.1", "The solution must maintain three distinct but interconnected business domains: Engineering, Customer BOM and Demand, and Demand Processing.", {
+  spec("1", "R1.1", "The solution must maintain three distinct but interconnected business domains:", {
     title: "Three connected business domains",
+    list: [
+      "Engineering: Defines what Rossell manufactures and the materials required to manufacture each finished good.",
+      "Customer BOM and Demand: Captures customer-submitted product structures, demand and forecast information.",
+      "Demand Processing: Consolidates ERP demand and customer forecast into raw-material demand using the applicable engineering BOM.",
+    ],
     ctx: ["engineering-bom", "customer-submission", "planning-run"],
     str: "must",
     owner: "IT & data",
@@ -260,7 +326,7 @@ const drafts: Draft[] = [
     str: "may",
     owner: "Engineering",
     q: ["Q16"],
-    from: P.pending,
+    pending: true,
   }),
   spec("2.4", "R2.4.2", "Consolidation must not discard meaningful engineering distinctions.", {
     title: "Keep engineering distinctions",
@@ -289,7 +355,7 @@ const drafts: Draft[] = [
     str: "may",
     owner: "Engineering",
     q: ["Q16"],
-    from: P.pending,
+    pending: true,
   }),
   spec("2.4", "R2.4.6", "Source component lines must remain traceable even when consolidated in the accepted engineering representation.", {
     title: "Source lines stay traceable",
@@ -331,7 +397,8 @@ const drafts: Draft[] = [
     str: "must",
     owner: "IT & data",
   }),
-  spec("3.1", "R3.1.5", "Customer submissions may contain finished-good demand, customer forecast, customer-defined BOM structures, or a combination of these.", {
+  spec("3.1", "R3.1.5", "Customer submissions may contain:", {
+    list: ["Finished-good demand.", "Customer forecast.", "Customer-defined BOM structures.", "A combination of the above."],
     title: "What a submission may contain",
     ctx: ["customer-submission", "customer-order", "customer-forecast"],
     str: "may",
@@ -436,7 +503,8 @@ const drafts: Draft[] = [
     str: "must",
     owner: "Sales & CS",
   }),
-  spec("3.3", "R3.3.7", "The system must distinguish: not provided, not yet mapped, confirmed mapping, rejected mapping and conflicting mapping.", {
+  spec("3.3", "R3.3.7", "The system must distinguish:", {
+    list: ["Not provided.", "Not yet mapped.", "Confirmed mapping.", "Rejected mapping.", "Conflicting mapping."],
     title: "Five mapping states",
     ctx: ["customer-submission"],
     str: "must",
@@ -593,7 +661,7 @@ const drafts: Draft[] = [
     str: "must",
     owner: "PPC",
     q: ["Q13"],
-    from: P.pending,
+    pending: true,
     plain: "Inside the horizon, firm ERP demand already covers it. Whether that holds only when matching ERP demand exists is still open.",
   }),
   spec("5.2", "R5.2.2", "Forecast beyond the exclusion horizon is exploded through the applicable BOM and added to raw-material demand.", {
@@ -634,7 +702,7 @@ const drafts: Draft[] = [
   }),
 
   // §6 Demand consolidation
-  spec("6", "R6.1", "Consolidated Demand = ERP Demand + Eligible Forecast-Derived Raw-Material Demand.", {
+  spec("6", "R6.1", "Consolidated Demand = ERP Demand + Eligible Forecast-Derived Raw-Material Demand", {
     title: "Consolidated demand formula",
     ctx: ["planning-run", "customer-order", "customer-forecast"],
     str: "must",
@@ -650,7 +718,8 @@ const drafts: Draft[] = [
     entities: ["planning.demand_calculation_detail"],
     q: ["Q15"],
   }),
-  spec("6", "R6.3", "The system must retain ERP demand, forecast demand received, forecast demand excluded, forecast demand included after BOM explosion, and consolidated raw-material demand.", {
+  spec("6", "R6.3", "The system must retain:", {
+    list: ["ERP demand.", "Forecast demand received.", "Forecast demand excluded.", "Forecast demand included after BOM explosion.", "Consolidated raw-material demand."],
     title: "Retain all five demand figures",
     ctx: ["planning-run"],
     str: "must",
@@ -672,6 +741,12 @@ const drafts: Draft[] = [
   }),
 
   // §7 Net demand and supply
+  spec("7", "RND.0", "The planning calculation must distinguish demand from supply.", {
+    title: "Demand and supply kept distinct",
+    ctx: ["planning-run", "supplier-order"],
+    str: "must",
+    owner: "PPC",
+  }),
   known("7", "RND.1", { title: "Net demand formula", ctx: ["planning-run", "supplier-order"], str: "must", owner: "PPC", entities: ["planning.consolidated_demand"] }),
   known("7", "RND.2", { title: "In-flight means open POs and in transit", ctx: ["supplier-order", "contractor"], str: "must", owner: "SCM" }),
   known("7", "RND.3", { title: "Received material is inventory", ctx: ["inventory-allocation", "supplier-order"], str: "must", owner: "Stores", q: ["Q4"] }),
@@ -680,34 +755,64 @@ const drafts: Draft[] = [
   known("7", "RND.6", { title: "Procurement may weigh stock and rules", ctx: ["supplier-order", "planning-run"], str: "may", owner: "SCM" }),
 
   // §8 Demand processing: logical design
-  spec("8", "R8.1", "The recommended logical processing entities are the demand horizon rule, the demand planning run, the demand calculation detail and the consolidated demand.", {
+  spec("8", "R8.1", "The recommended logical processing entities are:", {
     title: "Four logical processing entities",
     ctx: ["planning-run"],
     str: "should",
     owner: "IT & data",
     entities: ["planning.demand_horizon_rule", "planning.demand_planning_run", "planning.demand_calculation_detail", "planning.consolidated_demand"],
-    plain: "Logical entities: some may end up as views or materialised views rather than tables.",
+    list: [
+      "planning.demand_horizon_rule: Configurable forecast exclusion rules.",
+      "planning.demand_planning_run: Records each demand consolidation and forecast explosion execution.",
+      "planning.demand_calculation_detail: Preserves source contributions, exclusions, BOM explosion details and calculation lineage.",
+      "planning.consolidated_demand: Represents the resulting consolidated raw-material demand by material and period.",
+    ],
+    plain: "These are logical entities: some may end up as views or materialised views rather than physical tables.",
   }),
-  spec("8", "R8.2", "Each planning run should preserve the planning date, exclusion horizon, rule/configuration version, source data batches or versions, execution status, execution timestamp and calculation metadata.", {
+  spec("8", "R8.2", "Each run should preserve:", {
     title: "What each planning run records",
     ctx: ["planning-run"],
     str: "should",
     owner: "IT & data",
     entities: ["planning.demand_planning_run"],
+    list: ["Planning date.", "Exclusion horizon.", "Rule/configuration version.", "Source data batches or versions.", "Execution status.", "Execution timestamp.", "Calculation metadata."],
   }),
-  spec("8", "R8.3", "Each calculation detail should preserve the original source record, source type (ERP or forecast), original quantity and period, inclusion or exclusion decision and reason, finished good, BOM definition and revision used, component material, BOM quantity and UOM, calculated raw-material quantity and the resulting consolidated-demand reference.", {
+  spec("8", "R8.3", "Each calculation detail should preserve:", {
     title: "What each calculation line records",
     ctx: ["planning-run"],
     str: "should",
     owner: "IT & data",
     entities: ["planning.demand_calculation_detail"],
+    list: [
+      "Original source record.",
+      "Source type: ERP or forecast.",
+      "Original source quantity and period.",
+      "Inclusion/exclusion decision.",
+      "Exclusion reason, where applicable.",
+      "Finished-good material, where applicable.",
+      "BOM definition and revision used.",
+      "Component material.",
+      "BOM quantity and UOM.",
+      "Calculated raw-material quantity.",
+      "Resulting consolidated-demand reference.",
+    ],
   }),
-  spec("8", "R8.4", "Consolidated demand must support aggregation by raw material, planning period, customer, project and wire bundle or finished good, and expose ERP demand, forecast contribution and consolidated demand separately.", {
+  spec("8", "R8.4", "The output must support aggregation by:", {
     title: "Five ways to aggregate demand",
     ctx: ["planning-run"],
     str: "must",
     owner: "PPC",
     entities: ["planning.consolidated_demand"],
+    list: ["Raw material.", "Planning period.", "Customer.", "Project.", "Wire bundle / finished good, where relevant."],
+    plain: "The output is the consolidated raw-material demand.",
+  }),
+  spec("8", "R8.5", "It must expose ERP demand, forecast contribution and consolidated demand separately.", {
+    title: "ERP, forecast and total shown apart",
+    ctx: ["planning-run", "customer-order", "customer-forecast"],
+    str: "must",
+    owner: "PPC",
+    entities: ["planning.consolidated_demand"],
+    plain: "'It' is the consolidated-demand output in R8.4.",
   }),
 
   // §9 Auditability and reproducibility
@@ -765,19 +870,34 @@ const drafts: Draft[] = [
     owner: "PPC",
   }),
 
+  // §10 Proposed logical entity inventory
+  spec("10", "R10.1", "Existing master-data, reference and pre-staging entities should be reused wherever appropriate.", {
+    title: "Reuse existing master-data entities",
+    ctx: ["engineering-bom", "customer-submission", "planning-run"],
+    str: "should",
+    owner: "IT & data",
+    plain: "The entity list is a proposed logical inventory, not a final list of physical tables.",
+  }),
+
   // §12 Implementation boundary
-  spec("12", "R12.1", "No new database tables, migrations, database constraints or application changes are authorized until the logical model, relationships, attributes, business keys, lifecycle rules and validation rules have been reviewed and explicitly approved.", {
-    title: "No build before the model is approved",
+  spec("12", "R12.1", "No new database tables, migrations, database constraints or application changes are authorized by this document.", {
+    title: "This document authorises no build",
     ctx: ["planning-run", "engineering-bom", "customer-submission"],
     str: "must",
     owner: "IT & data",
-    plain: "The current work is logical design only; implementation starts after explicit approval.",
+    plain: "The current activity is logical design and business-rule definition.",
+  }),
+  spec("12", "R12.2", "Implementation should begin only after the logical model, relationships, attributes, business keys, lifecycle rules and validation rules have been reviewed and explicitly approved.", {
+    title: "Build only after explicit approval",
+    ctx: ["planning-run", "engineering-bom", "customer-submission"],
+    str: "should",
+    owner: "IT & data",
   }),
 
   // Working sessions: forecast handling
   known("WS-F", "WS.F1", { title: "Forecast only beyond horizon + buffer", ctx: ["customer-forecast", "planning-run"], str: "must", owner: "PPC", q: ["Q2"] }),
-  known("WS-F", "WS.F2", { title: "First two months excluded by default", ctx: ["customer-forecast", "planning-run"], str: "must", owner: "PPC", to: P.specV3, supersededBy: "R5.1.5" }),
-  known("WS-F", "WS.F3", { title: "LAM: first six months excluded", ctx: ["customer-forecast", "planning-run"], str: "must", owner: "PPC", to: P.specV3, supersededBy: "R5.1.2" }),
+  known("WS-F", "WS.F2", { title: "First two months excluded by default", ctx: ["customer-forecast", "planning-run"], str: "must", owner: "PPC", supersede: { on: "2026-11-07", by: "R5.1.5", note: "Replaced by R5.1.5: the horizon must not be hard-coded." } }),
+  known("WS-F", "WS.F3", { title: "LAM: first six months excluded", ctx: ["customer-forecast", "planning-run"], str: "must", owner: "PPC", supersede: { on: "2026-11-07", by: "R5.1.2", note: "Replaced by R5.1.2: six months is an example, not a fixed value." } }),
   known("WS-F", "WS.F4", { title: "Whole forecast file quantity is used", ctx: ["customer-forecast"], str: "must", owner: "PPC", q: ["Q18"] }),
 
   // Working sessions: promise dates
@@ -801,11 +921,10 @@ const drafts: Draft[] = [
   known("WS-A", "WS.A8", { title: "System suggests, people approve", ctx: ["inventory-allocation"], str: "should", owner: "PPC" }),
 ];
 
-export const ruleRegister: RuleRecord[] = drafts.map((d, i) => ({
-  ...d,
-  order: i + 1,
-  activeFrom: d.activeFrom ?? SAMPLE_PERIODS[sectionById.get(d.section)?.batch ?? "specV3"],
-}));
+export const ruleRegister: RuleRecord[] = drafts.map(({ meta: _meta, ...d }, i) => {
+  const history = historyFor({ ...d, meta: _meta });
+  return { ...d, order: i + 1, history, ...activeSpan(history) };
+});
 
 /** Spec rules that are new to the site (not copies of content/lifecycle.ts), for the Sources fact tally. */
 export const newSpecRules: RuleRecord[] = ruleRegister.filter((r) => !legacyById.has(r.id));
@@ -818,28 +937,49 @@ export const ruleQuestions = openQuestions
   .map((q) => ({ question: q, rules: ruleRegister.filter((r) => r.questions?.includes(q.id)) }))
   .filter((x) => x.rules.length > 0);
 
-/** Date the sample periods were last reviewed; used as "today" before the browser's clock is known. */
+/** Date the sample histories were last reviewed; used as "today" before the browser's clock is known. */
 export const REGISTER_AS_OF = "2026-11-12";
 
 /* ---------- integrity: fail the build on a bad edit ---------- */
+
+/** A real calendar date in ISO form (rejects 2026-02-31). */
+const isRealDate = (iso: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+};
 
 function validateRegister() {
   const errors: string[] = [];
   const ids = new Set<string>();
   const questionIds = new Set(openQuestions.map((q) => q.id));
-  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  const dupes = (xs: string[] | undefined) => !!xs && new Set(xs).size !== xs.length;
   for (const r of ruleRegister) {
     if (ids.has(r.id)) errors.push(`duplicate id ${r.id}`);
     ids.add(r.id);
     if (!r.contexts.length) errors.push(`${r.id}: no context`);
     for (const c of r.contexts) if (!(c in RULE_CONTEXTS)) errors.push(`${r.id}: unknown context ${c}`);
-    if (new Set(r.contexts).size !== r.contexts.length) errors.push(`${r.id}: repeated context`);
+    if (dupes(r.contexts) || dupes(r.questions) || dupes(r.entities)) errors.push(`${r.id}: repeated context, question or entity`);
     if (!sectionById.has(r.section)) errors.push(`${r.id}: unknown section ${r.section}`);
-    if (!iso.test(r.activeFrom)) errors.push(`${r.id}: activeFrom not ISO`);
-    if (r.activeTo && (!iso.test(r.activeTo) || r.activeTo <= r.activeFrom)) errors.push(`${r.id}: activeTo must be an ISO date after activeFrom`);
+    if (r.list && !r.list.length) errors.push(`${r.id}: empty list`);
+    if (!r.history.length) errors.push(`${r.id}: empty history`);
+    r.history.forEach((h, i) => {
+      if (!(h.state in RULE_STATES)) errors.push(`${r.id}: unknown state ${h.state}`);
+      if (!isRealDate(h.from)) errors.push(`${r.id}: history date ${h.from} is not a real ISO date`);
+      if (i > 0 && h.from <= r.history[i - 1].from) errors.push(`${r.id}: history dates must strictly increase`);
+      if (i > 0 && h.state === r.history[i - 1].state) errors.push(`${r.id}: repeated state ${h.state}`);
+    });
     for (const q of r.questions ?? []) if (!questionIds.has(q)) errors.push(`${r.id}: unknown question ${q}`);
-    if (r.supersededBy && !ruleById.has(r.supersededBy)) errors.push(`${r.id}: unknown supersededBy ${r.supersededBy}`);
-    if (r.supersededBy && !r.activeTo) errors.push(`${r.id}: superseded rule needs activeTo`);
+    const superseded = r.history.some((h) => h.state === "superseded");
+    if (superseded !== !!r.supersededBy) errors.push(`${r.id}: a superseded state and supersededBy go together`);
+    if (r.supersededBy) {
+      const by = ruleById.get(r.supersededBy);
+      const on = r.history.find((h) => h.state === "superseded")?.from;
+      if (r.supersededBy === r.id) errors.push(`${r.id}: cannot supersede itself`);
+      else if (!by) errors.push(`${r.id}: unknown supersededBy ${r.supersededBy}`);
+      else if (on && (!by.activeFrom || by.activeFrom > on)) errors.push(`${r.id}: ${by.id} must be active by ${on}, when it replaces this rule`);
+    }
   }
   for (const id of legacyById.keys()) if (!ids.has(id)) errors.push(`business rule ${id} (content/lifecycle.ts) is missing from the register`);
   if (errors.length) throw new Error(`content/rules.ts is invalid:\n- ${errors.join("\n- ")}`);

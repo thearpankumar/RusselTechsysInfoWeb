@@ -6,10 +6,11 @@ import type { OpenQuestion } from "@/content/types-extra";
 import { ruleQuestions } from "@/content/rules";
 import { Button, Cite, Marker } from "@/components/ui-rt";
 
-const STATUS: Record<OpenQuestion["status"], { label: string; shape: "dot" | "hollow" }> = {
-  open: { label: "Open", shape: "hollow" },
-  "partly-answered": { label: "Partly answered", shape: "dot" },
-  answered: { label: "Answered", shape: "dot" },
+// Open = hatched (waiting, the same mark as "Needs confirmation"); partly answered = grey dot; answered = highlighted dot.
+const STATUS: Record<OpenQuestion["status"], { label: string; shape: "dot" | "hatch"; tone: "primary" | "mid" }> = {
+  open: { label: "Open", shape: "hatch", tone: "mid" },
+  "partly-answered": { label: "Partly answered", shape: "dot", tone: "mid" },
+  answered: { label: "Answered", shape: "dot", tone: "primary" },
 };
 
 export function RuleQuestions({ onFilter, onOpenRule }: { onFilter: (questionId: string) => void; onOpenRule: (id: string) => void }) {
@@ -25,7 +26,7 @@ export function RuleQuestions({ onFilter, onOpenRule }: { onFilter: (questionId:
               {q.note && <p className="mt-2 t-body-sm text-muted">{q.note}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="inline-flex h-6 items-center gap-2 rounded-full border border-border px-2 t-mono-sm text-on-surface">
-                  <Marker tone="past" shape={st.shape} size={8} />
+                  <Marker tone={st.tone} shape={st.shape} size={8} />
                   {st.label}
                 </span>
                 <Cite ids={q.sources} />

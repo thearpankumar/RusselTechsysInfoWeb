@@ -292,6 +292,37 @@
   );
 }
 
+/* Native date input on DESIGN.md terms (WebKit/Blink): tabular digits, muted separators while editing, and the
+   system calendar glyph replaced by the 1.5px line calendar (lucide) in the muted token, brightening on hover.
+   Not stylable: the picker popup (the OS's, themed by color-scheme) and, in current Chrome, the highlight on the
+   segment being typed (browser-drawn; author CSS on ::-webkit-datetime-edit-*-field:focus is ignored). Other
+   engines keep their own icon. */
+@utility date-field {
+  font-variant-numeric: tabular-nums;
+  &::-webkit-datetime-edit,
+  &::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  &:focus::-webkit-datetime-edit-text {
+    color: var(--color-muted);
+  }
+  &::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    margin: 0 0 0 8px;
+    padding: 0;
+    background: var(--color-muted);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2v4'/%3E%3Cpath d='M16 2v4'/%3E%3Crect width='18' height='18' x='3' y='4' rx='2'/%3E%3Cpath d='M3 10h18'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2v4'/%3E%3Cpath d='M16 2v4'/%3E%3Crect width='18' height='18' x='3' y='4' rx='2'/%3E%3Cpath d='M3 10h18'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: background-color 150ms ease-out;
+  }
+  &:hover::-webkit-calendar-picker-indicator,
+  &:focus::-webkit-calendar-picker-indicator {
+    background: var(--color-on-surface);
+  }
+}
+
 /* ---------- Base ---------- */
 
 @layer base {

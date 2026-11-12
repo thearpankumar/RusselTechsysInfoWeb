@@ -331,6 +331,17 @@ export type RuleStrength = "must" | "should" | "may";
 /** Where the rule was agreed: the business-rules spec or the working sessions. */
 export type RuleOrigin = "spec" | "session";
 
+/** Lifecycle state of a rule. Only "active" counts as Active; every other state is Inactive. */
+export type RuleLifecycle = "draft" | "review" | "approved" | "active" | "suspended" | "retired" | "superseded";
+
+/** One dated state change. A state lasts until the next change's `from` (no `to`, so no gaps or overlaps). */
+export interface RuleStateChange {
+  state: RuleLifecycle;
+  /** ISO date the state starts. */
+  from: string;
+  note?: string;
+}
+
 export interface RuleRecord extends Sourced {
   /** Existing ids are kept (R2.1.1, RND.3, WS.A2); new spec rules are R<section>.<n>. */
   id: string;
@@ -338,8 +349,10 @@ export interface RuleRecord extends Sourced {
   order: number;
   /** Short name for cards and table rows. */
   title: string;
-  /** The rule as written. */
+  /** The rule as written (spec rules verbatim; session rules as recorded). */
   text: string;
+  /** Items the statement lists, quoted as written ("The system must distinguish:" → five states). */
+  list?: string[];
   plain?: string;
   /** RULE_SECTIONS id ("2.3", "WS-A"). */
   section: string;
@@ -349,9 +362,11 @@ export interface RuleRecord extends Sourced {
   origin: RuleOrigin;
   /** Owning team. SAMPLE until confirmed. */
   owner: string;
-  /** ISO date the rule became active. SAMPLE until confirmed. */
-  activeFrom: string;
-  /** ISO date the rule stopped applying (exclusive); absent = open-ended. */
+  /** Dated lifecycle, oldest first. SAMPLE until confirmed. */
+  history: RuleStateChange[];
+  /** First date the rule was active (derived from history); absent if it never was. */
+  activeFrom?: string;
+  /** Date its last active span ended (derived); absent while active or if it never was. */
   activeTo?: string;
   /** Rule that replaced this one. */
   supersededBy?: string;

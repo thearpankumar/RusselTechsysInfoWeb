@@ -1,9 +1,9 @@
 "use client";
 
 // Register state (query, view, open rule) mirrored into the URL so any view can be shared.
-// Read from window.location after mount and written with history.replaceState, which Next integrates with its
-// router. useSearchParams is avoided on purpose: on these prerendered pages it would client-render the tree
-// up to a Suspense boundary.
+// Read from window.location after mount and written with history.replaceState(null, …), the form Next documents:
+// Next copies its own router state into the entry and syncs the URL. useSearchParams is avoided on purpose: on
+// these prerendered pages it would client-render the tree up to a Suspense boundary.
 import * as React from "react";
 import { getRule } from "@/content/rules";
 import { DEFAULT_QUERY, parseRuleQuery, parseView, writeRuleParams, type RuleQuery, type RuleView } from "@/lib/rules";
@@ -45,7 +45,7 @@ export function useRulesState() {
       writeRuleParams(url.searchParams, state.query, state.view, state.openId);
       const next = url.pathname + url.search + url.hash;
       if (next !== window.location.pathname + window.location.search + window.location.hash) {
-        window.history.replaceState(window.history.state, "", next);
+        window.history.replaceState(null, "", next);
       }
     }, 250);
     return () => window.clearTimeout(t);
@@ -55,9 +55,9 @@ export function useRulesState() {
     setState((s) => ({ ...s, query: { ...s.query, ...(typeof patch === "function" ? patch(s.query) : patch) } }));
   }, []);
 
-  /** Clear every filter; keep sort and as-of. */
+  /** Clear every filter; keep sort and the as-of / compare dates. */
   const clearFilters = React.useCallback(() => {
-    setState((s) => ({ ...s, query: { ...DEFAULT_QUERY, sort: s.query.sort, dir: s.query.dir, asOf: s.query.asOf } }));
+    setState((s) => ({ ...s, query: { ...DEFAULT_QUERY, sort: s.query.sort, dir: s.query.dir, asOf: s.query.asOf, vs: s.query.vs } }));
   }, []);
 
   const setView = React.useCallback((view: RuleView) => {

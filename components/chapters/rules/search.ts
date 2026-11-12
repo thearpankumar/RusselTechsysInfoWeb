@@ -8,7 +8,7 @@ export const searchItems: SearchItem[] = ruleRegister.map((r) => ({
   label: `${r.id} ${r.title}`,
   group: "Business rules",
   hint: ruleSectionLabel(r.section),
-  keywords: [r.text, r.plain ?? "", ...r.contexts.map((c) => RULE_CONTEXTS[c].label), r.owner, ...(r.entities ?? []), ...(r.questions ?? [])],
+  keywords: [r.text, ...(r.list ?? []), r.plain ?? "", ...r.contexts.map((c) => RULE_CONTEXTS[c].label), r.owner, ...(r.entities ?? []), ...(r.questions ?? [])],
   href: "#rules-register",
   open: { type: "rule", id: r.id },
 }));

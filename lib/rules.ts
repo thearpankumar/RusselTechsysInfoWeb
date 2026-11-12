@@ -1,19 +1,51 @@
-// Business-rules register logic: status by date, search, facets, sort, URL state and CSV. Pure; no React.
-import type { RuleContext, RuleOrigin, RuleRecord, RuleStrength } from "@/content/types-extra";
-import { RULE_CONTEXTS, RULE_CONTEXT_ORDER, RULE_ORIGINS, RULE_OWNERS, RULE_SECTIONS, RULE_STRENGTHS, ruleRegister, ruleSectionLabel } from "@/content/rules";
+// Business-rules register logic: lifecycle state on a date, compare two dates, search, facets, sort, URL state
+// and CSV. Pure; no React. Excel export lives in lib/rulesExcel.ts (lazy-loaded).
+import type { RuleContext, RuleLifecycle, RuleOrigin, RuleRecord, RuleStateChange, RuleStrength } from "@/content/types-extra";
+import {
+  RULE_CONTEXTS,
+  RULE_CONTEXT_ORDER,
+  RULE_ORIGINS,
+  RULE_OWNERS,
+  RULE_SECTIONS,
+  RULE_STATES,
+  RULE_STATE_ORDER,
+  RULE_STRENGTHS,
+  ruleRegister,
+  ruleSectionLabel,
+} from "@/content/rules";
 import { openQuestions } from "@/content/openQuestions";
+
+const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
 
 /* ---------- dates ---------- */
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
-export const isIsoDate = (s: string | null | undefined): s is string => !!s && ISO.test(s) && !Number.isNaN(Date.parse(s));
+/** Range the as-of and compare dates may take (the register's history sits inside it). */
+export const AS_OF_MIN = "2026-01-01";
+export const AS_OF_MAX = "2028-12-31";
+
+/** A real calendar date in ISO form: rejects 2026-02-31, 0000-01-01 style values. */
+export function isIsoDate(s: string | null | undefined): s is string {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return y >= 1000 && t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}
+
+/** A usable as-of date: real and inside [AS_OF_MIN, AS_OF_MAX]. */
+export const isAsOfDate = (s: string | null | undefined): s is string => isIsoDate(s) && s >= AS_OF_MIN && s <= AS_OF_MAX;
 
 /** "2026-11-07" → "7 Nov 2026" (no locale or time-zone drift). */
 export function formatDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+
+/** "2026-11-07" → "7 Nov". */
+export function formatShort(iso: string): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${d} ${MONTHS[m - 1]}`;
 }
 
 /** Today in the browser's local time zone, as an ISO date. */
@@ -28,18 +60,59 @@ export const dayNumber = (iso: string) => {
   return Date.UTC(y, m - 1, d) / 86_400_000;
 };
 
-/* ---------- status ---------- */
+/* ---------- lifecycle ---------- */
 
-export type RuleState = "active" | "scheduled" | "retired";
+/** "none" = the rule had not been drafted yet on that date. */
+export type RuleStateValue = RuleLifecycle | "none";
 
-/** Active when activeFrom ≤ asOf < activeTo. Status is always derived from the period, never stored. */
-export function ruleState(r: RuleRecord, asOf: string): RuleState {
-  if (asOf < r.activeFrom) return "scheduled";
-  if (r.activeTo && asOf >= r.activeTo) return "retired";
-  return "active";
+export const STATE_LABEL: Record<RuleStateValue, string> = {
+  ...(Object.fromEntries(RULE_STATE_ORDER.map((s) => [s, RULE_STATES[s].label])) as Record<RuleLifecycle, string>),
+  none: "Not yet drafted",
+};
+
+/** The history entry in force on `date` (null before the first one). */
+export function stateAt(r: RuleRecord, date: string): RuleStateChange | null {
+  let cur: RuleStateChange | null = null;
+  for (const h of r.history) {
+    if (h.from <= date) cur = h;
+    else break;
+  }
+  return cur;
 }
 
-export const isActive = (r: RuleRecord, asOf: string) => ruleState(r, asOf) === "active";
+export const ruleStateAt = (r: RuleRecord, date: string): RuleStateValue => stateAt(r, date)?.state ?? "none";
+
+/** Active = the "active" lifecycle state. Every other state is Inactive. */
+export const isActive = (r: RuleRecord, date: string) => ruleStateAt(r, date) === "active";
+
+/** The change after the one in force on `date`, if any (e.g. the date an approved rule goes live). */
+function nextChange(r: RuleRecord, date: string): RuleStateChange | undefined {
+  return r.history.find((h) => h.from > date);
+}
+
+/** One line for the status cell: the active period, or why the rule is not active. */
+export function statusLine(r: RuleRecord, date: string): string {
+  const cur = stateAt(r, date);
+  const next = nextChange(r, date);
+  if (!cur) return `Not yet drafted · first draft ${formatDate(r.history[0].from)}`;
+  switch (cur.state) {
+    case "active":
+      return `${formatDate(cur.from)} → ${next ? formatDate(next.from) : "open"}`;
+    case "approved":
+      return next?.state === "active" ? `Approved · active from ${formatDate(next.from)}` : `Approved since ${formatDate(cur.from)}`;
+    case "review":
+      return `Under review since ${formatDate(cur.from)}`;
+    case "draft":
+      return `Draft since ${formatDate(cur.from)}`;
+    case "suspended":
+      return `Suspended since ${formatDate(cur.from)}`;
+    case "retired":
+    case "superseded": {
+      const span = r.activeFrom ? `Active ${formatDate(r.activeFrom)} → ${formatDate(cur.from)}` : `${STATE_LABEL[cur.state]} ${formatDate(cur.from)}`;
+      return cur.state === "superseded" && r.supersededBy ? `${span} · replaced by ${r.supersededBy}` : span;
+    }
+  }
+}
 
 const openQuestionIds = new Set(openQuestions.filter((q) => q.status !== "answered").map((q) => q.id));
 
@@ -47,17 +120,37 @@ const openQuestionIds = new Set(openQuestions.filter((q) => q.status !== "answer
 export const pendingQuestions = (r: RuleRecord) => (r.questions ?? []).filter((q) => openQuestionIds.has(q));
 export const needsConfirmation = (r: RuleRecord) => pendingQuestions(r).length > 0;
 
+/** State on `before` and on `after`, when they differ. */
+export function changeBetween(r: RuleRecord, before: string, after: string): { from: RuleStateValue; to: RuleStateValue } | null {
+  const a = ruleStateAt(r, before);
+  const b = ruleStateAt(r, after);
+  return a === b ? null : { from: a, to: b };
+}
+
+/** Every history entry dated in (from, to], newest first: the change log between two dates. */
+export function changesInWindow(rules: RuleRecord[], from: string, to: string): { rule: RuleRecord; change: RuleStateChange; previous: RuleStateValue }[] {
+  const [lo, hi] = from <= to ? [from, to] : [to, from];
+  const out: { rule: RuleRecord; change: RuleStateChange; previous: RuleStateValue }[] = [];
+  for (const r of rules)
+    r.history.forEach((h, i) => {
+      if (h.from > lo && h.from <= hi) out.push({ rule: r, change: h, previous: i > 0 ? r.history[i - 1].state : "none" });
+    });
+  return out.sort((a, b) => b.change.from.localeCompare(a.change.from) || a.rule.order - b.rule.order);
+}
+
 /* ---------- query ---------- */
 
 export type RuleStatusValue = "active" | "inactive";
 export type RuleView = "table" | "cards" | "timeline";
 export type RuleSortKey = "id" | "title" | "status" | "from" | "to" | "context" | "strength" | "owner";
 export type SortDir = "asc" | "desc";
-export type FacetKey = "status" | "ctx" | "sec" | "str" | "origin" | "owner";
+export type FacetKey = "status" | "state" | "ctx" | "sec" | "str" | "origin" | "owner";
+export const FACETS: FacetKey[] = ["status", "state", "ctx", "sec", "str", "origin", "owner"];
 
 export interface RuleQuery {
   q: string;
   status: RuleStatusValue[];
+  state: RuleStateValue[];
   ctx: RuleContext[];
   sec: string[];
   str: RuleStrength[];
@@ -69,6 +162,10 @@ export interface RuleQuery {
   question: string | null;
   /** null = today. */
   asOf: string | null;
+  /** Compare the as-of date with this earlier (or later) date. */
+  vs: string | null;
+  /** With `vs`: only rules whose state differs between the two dates. */
+  changed: boolean;
   sort: RuleSortKey;
   dir: SortDir;
 }
@@ -76,6 +173,7 @@ export interface RuleQuery {
 export const DEFAULT_QUERY: RuleQuery = {
   q: "",
   status: [],
+  state: [],
   ctx: [],
   sec: [],
   str: [],
@@ -84,16 +182,19 @@ export const DEFAULT_QUERY: RuleQuery = {
   flag: false,
   question: null,
   asOf: null,
+  vs: null,
+  changed: false,
   sort: "id",
   dir: "asc",
 };
 
-/** True when any filter (not sort, not as-of) narrows the list. */
+/** True when any filter (not sort, not dates) narrows the list. */
 export const hasFilters = (q: RuleQuery) =>
-  !!(q.q.trim() || q.status.length || q.ctx.length || q.sec.length || q.str.length || q.origin.length || q.owner.length || q.flag || q.question);
+  !!(q.q.trim() || FACETS.some((f) => (q[f] as string[]).length) || q.flag || q.question || (q.vs && q.changed));
 
 export const FACET_LABEL: Record<FacetKey, string> = {
   status: "Status",
+  state: "State",
   ctx: "Context",
   sec: "Section",
   str: "Strength",
@@ -103,19 +204,21 @@ export const FACET_LABEL: Record<FacetKey, string> = {
 
 export const STATUS_LABEL: Record<RuleStatusValue, string> = { active: "Active", inactive: "Inactive" };
 
-/** Label of one facet value, for chips and CSV. */
+/** Label of one facet value, for chips and exports. */
 export function facetValueLabel(facet: FacetKey, value: string): string {
   switch (facet) {
     case "status":
-      return STATUS_LABEL[value as RuleStatusValue] ?? value;
+      return has(STATUS_LABEL, value) ? STATUS_LABEL[value as RuleStatusValue] : value;
+    case "state":
+      return has(STATE_LABEL, value) ? STATE_LABEL[value as RuleStateValue] : value;
     case "ctx":
-      return RULE_CONTEXTS[value as RuleContext]?.label ?? value;
+      return has(RULE_CONTEXTS, value) ? RULE_CONTEXTS[value as RuleContext].label : value;
     case "sec":
       return ruleSectionLabel(value);
     case "str":
-      return RULE_STRENGTHS[value as RuleStrength]?.label ?? value;
+      return has(RULE_STRENGTHS, value) ? RULE_STRENGTHS[value as RuleStrength].label : value;
     case "origin":
-      return RULE_ORIGINS[value as RuleOrigin]?.label ?? value;
+      return has(RULE_ORIGINS, value) ? RULE_ORIGINS[value as RuleOrigin].label : value;
     default:
       return value;
   }
@@ -126,6 +229,8 @@ function facetValues(r: RuleRecord, facet: FacetKey, asOf: string): string[] {
   switch (facet) {
     case "status":
       return [isActive(r, asOf) ? "active" : "inactive"];
+    case "state":
+      return [ruleStateAt(r, asOf)];
     case "ctx":
       return r.contexts;
     case "sec":
@@ -139,8 +244,6 @@ function facetValues(r: RuleRecord, facet: FacetKey, asOf: string): string[] {
   }
 }
 
-const selected = (q: RuleQuery, facet: FacetKey): string[] => q[facet] as string[];
-
 /* ---------- search ---------- */
 
 const haystack = new Map(
@@ -150,6 +253,7 @@ const haystack = new Map(
       r.id,
       r.title,
       r.text,
+      ...(r.list ?? []),
       r.plain ?? "",
       ruleSectionLabel(r.section),
       ...r.contexts.map((c) => RULE_CONTEXTS[c].label),
@@ -167,17 +271,22 @@ const haystack = new Map(
 
 export const searchTokens = (q: string) => q.toLowerCase().split(/\s+/).filter(Boolean);
 
+/** Entities a search matched (shown under the row when nothing visible explains the match). */
+export const matchedEntities = (r: RuleRecord, tokens: string[]) =>
+  tokens.length ? (r.entities ?? []).filter((e) => tokens.some((t) => e.toLowerCase().includes(t))) : [];
+
 /* ---------- filter, facets, sort ---------- */
 
 /** Apply the query. `except` skips one facet (for counts computed against the other filters). */
-export function filterRules(rules: RuleRecord[], q: RuleQuery, asOf: string, except?: FacetKey): RuleRecord[] {
+export function filterRules(rules: RuleRecord[], q: RuleQuery, asOf: string, except?: FacetKey | "flag"): RuleRecord[] {
   const tokens = searchTokens(q.q);
-  const facets: FacetKey[] = (["status", "ctx", "sec", "str", "origin", "owner"] as FacetKey[]).filter((f) => f !== except && selected(q, f).length > 0);
+  const facets = FACETS.filter((f) => f !== except && (q[f] as string[]).length > 0);
   return rules.filter((r) => {
-    if (q.flag && !needsConfirmation(r)) return false;
+    if (q.flag && except !== "flag" && !needsConfirmation(r)) return false;
     if (q.question && !(r.questions ?? []).includes(q.question)) return false;
+    if (q.vs && q.changed && !changeBetween(r, q.vs, asOf)) return false;
     for (const f of facets) {
-      const want = selected(q, f);
+      const want = q[f] as string[];
       if (!facetValues(r, f, asOf).some((v) => want.includes(v))) return false;
     }
     if (tokens.length) {
@@ -195,6 +304,9 @@ export function facetCounts(rules: RuleRecord[], q: RuleQuery, asOf: string, fac
   return counts;
 }
 
+/** Rules that need confirmation, honouring every other active filter (the flag toggle's live count). */
+export const flagCount = (rules: RuleRecord[], q: RuleQuery, asOf: string) => filterRules(rules, q, asOf, "flag").filter(needsConfirmation).length;
+
 export interface FacetOption {
   value: string;
   label: string;
@@ -207,6 +319,7 @@ export const FACET_OPTIONS: Record<FacetKey, FacetOption[]> = {
     { value: "active", label: STATUS_LABEL.active },
     { value: "inactive", label: STATUS_LABEL.inactive },
   ],
+  state: [...RULE_STATE_ORDER, "none" as const].map((s) => ({ value: s, label: STATE_LABEL[s] })),
   ctx: RULE_CONTEXT_ORDER.map((c) => ({ value: c, label: RULE_CONTEXTS[c].label })),
   sec: RULE_SECTIONS.map((s) => ({ value: s.id, label: ruleSectionLabel(s.id), group: s.part })),
   str: (Object.keys(RULE_STRENGTHS) as RuleStrength[]).map((s) => ({ value: s, label: RULE_STRENGTHS[s].label })),
@@ -226,7 +339,8 @@ export const SORT_LABEL: Record<RuleSortKey, string> = {
 };
 
 const STRENGTH_RANK: Record<RuleStrength, number> = { must: 0, should: 1, may: 2 };
-const STATE_RANK: Record<RuleState, number> = { active: 0, scheduled: 1, retired: 2 };
+const STATE_RANK: Record<RuleStateValue, number> = { active: 0, approved: 1, review: 2, draft: 3, suspended: 4, superseded: 5, retired: 6, none: 7 };
+const LAST = "9999-12-31";
 
 export function sortRules(rules: RuleRecord[], key: RuleSortKey, dir: SortDir, asOf: string): RuleRecord[] {
   const cmp = (a: RuleRecord, b: RuleRecord): number => {
@@ -236,12 +350,13 @@ export function sortRules(rules: RuleRecord[], key: RuleSortKey, dir: SortDir, a
       case "title":
         return a.title.localeCompare(b.title);
       case "status":
-        return STATE_RANK[ruleState(a, asOf)] - STATE_RANK[ruleState(b, asOf)];
+        return STATE_RANK[ruleStateAt(a, asOf)] - STATE_RANK[ruleStateAt(b, asOf)];
       case "from":
-        return a.activeFrom.localeCompare(b.activeFrom);
+        // Never-active rules last when ascending.
+        return (a.activeFrom ?? LAST).localeCompare(b.activeFrom ?? LAST);
       case "to":
-        // Open-ended rules last when ascending.
-        return (a.activeTo ?? "9999-12-31").localeCompare(b.activeTo ?? "9999-12-31");
+        // Still-active (open-ended) rules last when ascending.
+        return (a.activeTo ?? LAST).localeCompare(b.activeTo ?? LAST);
       case "context":
         return RULE_CONTEXT_ORDER.indexOf(a.contexts[0]) - RULE_CONTEXT_ORDER.indexOf(b.contexts[0]);
       case "strength":
@@ -256,26 +371,26 @@ export function sortRules(rules: RuleRecord[], key: RuleSortKey, dir: SortDir, a
 
 /* ---------- URL state ---------- */
 
-const LIST_PARAMS: Record<FacetKey, string> = { status: "status", ctx: "ctx", sec: "sec", str: "str", origin: "src", owner: "own" };
-export const RULE_PARAMS = ["q", ...Object.values(LIST_PARAMS), "flag", "question", "asOf", "sort", "dir", "view", "rule"];
+const LIST_PARAMS: Record<FacetKey, string> = { status: "status", state: "state", ctx: "ctx", sec: "sec", str: "str", origin: "src", owner: "own" };
+export const RULE_PARAMS = ["q", ...Object.values(LIST_PARAMS), "flag", "question", "asOf", "vs", "changed", "sort", "dir", "view", "rule"];
 
-const known = (facet: FacetKey) => new Set(FACET_OPTIONS[facet].map((o) => o.value));
 const VIEWS: RuleView[] = ["table", "cards", "timeline"];
 
 export function parseRuleQuery(params: URLSearchParams): RuleQuery {
   const list = (facet: FacetKey) => {
-    const ok = known(facet);
-    return (params.get(LIST_PARAMS[facet]) ?? "")
-      .split(",")
-      .map((v) => v.trim())
-      .filter((v, i, a) => v && ok.has(v) && a.indexOf(v) === i);
+    const ok = new Set(FACET_OPTIONS[facet].map((o) => o.value));
+    // Accept both ?ctx=a,b and ?ctx=a&ctx=b.
+    const values = params.getAll(LIST_PARAMS[facet]).flatMap((v) => v.split(",")).map((v) => v.trim());
+    return values.filter((v, i) => v && ok.has(v) && values.indexOf(v) === i);
   };
-  const sort = params.get("sort") as RuleSortKey | null;
+  const sort = params.get("sort");
   const asOf = params.get("asOf");
+  const vs = params.get("vs");
   const question = params.get("question");
   return {
     q: params.get("q") ?? "",
     status: list("status") as RuleStatusValue[],
+    state: list("state") as RuleStateValue[],
     ctx: list("ctx") as RuleContext[],
     sec: list("sec"),
     str: list("str") as RuleStrength[],
@@ -283,8 +398,10 @@ export function parseRuleQuery(params: URLSearchParams): RuleQuery {
     owner: list("owner"),
     flag: params.get("flag") === "1",
     question: question && openQuestions.some((x) => x.id === question) ? question : null,
-    asOf: isIsoDate(asOf) ? asOf : null,
-    sort: sort && sort in SORT_LABEL ? sort : "id",
+    asOf: isAsOfDate(asOf) ? asOf : null,
+    vs: isAsOfDate(vs) ? vs : null,
+    changed: params.get("changed") === "1",
+    sort: sort && has(SORT_LABEL, sort) ? (sort as RuleSortKey) : "id",
     dir: params.get("dir") === "desc" ? "desc" : "asc",
   };
 }
@@ -295,13 +412,15 @@ export const parseView = (v: string | null): RuleView | null => (v && (VIEWS as 
 export function writeRuleParams(params: URLSearchParams, q: RuleQuery, view: RuleView, rule: string | null) {
   for (const p of RULE_PARAMS) params.delete(p);
   if (q.q.trim()) params.set("q", q.q.trim());
-  for (const f of Object.keys(LIST_PARAMS) as FacetKey[]) {
-    const v = selected(q, f);
+  for (const f of FACETS) {
+    const v = q[f] as string[];
     if (v.length) params.set(LIST_PARAMS[f], v.join(","));
   }
   if (q.flag) params.set("flag", "1");
   if (q.question) params.set("question", q.question);
   if (q.asOf) params.set("asOf", q.asOf);
+  if (q.vs) params.set("vs", q.vs);
+  if (q.vs && q.changed) params.set("changed", "1");
   if (q.sort !== "id") params.set("sort", q.sort);
   if (q.dir !== "asc") params.set("dir", q.dir);
   if (view !== "table") params.set("view", view);
@@ -310,39 +429,59 @@ export function writeRuleParams(params: URLSearchParams, q: RuleQuery, view: Rul
 
 /* ---------- timeline axis ---------- */
 
-/** Shared axis for every period strip: first start − 1 month → latest date (+ as-of) + 2 months. */
-export function timelineDomain(asOf: string): { start: number; end: number; ticks: { day: number; label: string }[] } {
-  const dates = ruleRegister.flatMap((r) => [r.activeFrom, ...(r.activeTo ? [r.activeTo] : [])]).concat(asOf);
-  const min = dates.reduce((a, b) => (a < b ? a : b));
-  const max = dates.reduce((a, b) => (a > b ? a : b));
+export interface TimelineAxis {
+  start: number;
+  end: number;
+  ticks: { day: number; label: string }[];
+}
+
+/** Shared month axis: the month before the first history date → two months after the latest date (incl. as-of / vs). */
+export function timelineDomain(asOf: string, vs?: string | null): TimelineAxis {
+  let min = asOf;
+  let max = asOf;
+  for (const d of [...ruleRegister.flatMap((r) => r.history.map((h) => h.from)), ...(vs ? [vs] : [])]) {
+    if (d < min) min = d;
+    if (d > max) max = d;
+  }
   const [y0, m0] = min.split("-").map(Number);
   const [y1, m1] = max.split("-").map(Number);
-  // From the first of the month before `min` to the first of the month two after `max`.
   const startMonth = y0 * 12 + (m0 - 1) - 1;
   const endMonth = y1 * 12 + (m1 - 1) + 2;
   const ticks: { day: number; label: string }[] = [];
   for (let m = startMonth; m <= endMonth; m++) {
     const y = Math.floor(m / 12);
     const mo = m % 12;
-    const iso = `${y}-${String(mo + 1).padStart(2, "0")}-01`;
-    ticks.push({ day: dayNumber(iso), label: mo === 0 || m === startMonth ? `${MONTHS[mo]} ${y}` : MONTHS[mo] });
+    ticks.push({ day: dayNumber(`${y}-${String(mo + 1).padStart(2, "0")}-01`), label: mo === 0 || m === startMonth ? `${MONTHS[mo]} ${y}` : MONTHS[mo] });
   }
   return { start: ticks[0].day, end: ticks[ticks.length - 1].day, ticks };
 }
 
-/* ---------- CSV ---------- */
+/* ---------- exports ---------- */
 
-const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+/** Spreadsheet-safe text: a leading = + - @ (or tab / CR) would be read as a formula (OWASP CSV injection). */
+export const safeCell = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
+
+/** The statement with its list items, as one line of text. */
+export const fullText = (r: RuleRecord) => (r.list?.length ? `${r.text} ${r.list.join(" ")}` : r.text);
+
+/** "2026-07-06 Draft; 2026-07-20 Under review; …" */
+export const historyText = (r: RuleRecord) => r.history.map((h) => `${h.from} ${STATE_LABEL[h.state]}`).join("; ");
+
+const csvCell = (v: string) => {
+  const s = safeCell(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
 
 /** CSV of the rules as shown (filtered and sorted), with the as-of status. */
 export function rulesToCsv(rules: RuleRecord[], asOf: string): string {
-  const head = ["ID", "Title", "Rule", `Status (as of ${asOf})`, "Active from", "Active to", "Contexts", "Section", "Strength", "Owner", "Source", "Waits on", "Superseded by", "Entities", "Source ids", "Metadata"];
+  const head = ["ID", "Title", "Rule", "Status", `State on ${asOf}`, "Active from", "Active to", "Contexts", "Section", "Strength", "Owner", "Source", "Waits on", "Superseded by", "Entities", "State history", "Source ids", "Metadata"];
   const rows = rules.map((r) => [
     r.id,
     r.title,
-    r.text,
+    fullText(r),
     isActive(r, asOf) ? "Active" : "Inactive",
-    r.activeFrom,
+    STATE_LABEL[ruleStateAt(r, asOf)],
+    r.activeFrom ?? "",
     r.activeTo ?? "",
     r.contexts.map((c) => RULE_CONTEXTS[c].label).join("; "),
     ruleSectionLabel(r.section),
@@ -352,8 +491,21 @@ export function rulesToCsv(rules: RuleRecord[], asOf: string): string {
     pendingQuestions(r).join("; "),
     r.supersededBy ?? "",
     (r.entities ?? []).join("; "),
+    historyText(r),
     r.sources.join("; "),
-    "Sample status period, contexts and owner",
+    "Sample state history, contexts and owner",
   ]);
-  return "﻿" + [head, ...rows].map((row) => row.map(cell).join(",")).join("\r\n");
+  return "﻿" + [head, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+}
+
+/** Save a Blob as a file (revoked after the browser has started the download). */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
