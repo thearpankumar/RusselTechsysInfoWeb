@@ -104,6 +104,10 @@
   --duration-fast: 150ms;
   --duration-base: 200ms;
 
+  /* Height of the sticky section tabs (ChapterShell: 12px padding ×2 + 52px track + 1px border), so content that
+     sticks below them (e.g. the rules table header) can sit right under the bar on desktop. */
+  --section-tabs-h: calc(24px + 52px + 1px);
+
   /* Ordered categorical palette for programmatic use: var(--data-1) … */
   --data-1: var(--color-data-sage);
   --data-2: var(--color-data-slate);

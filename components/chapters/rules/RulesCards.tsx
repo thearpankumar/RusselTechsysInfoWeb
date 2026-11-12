@@ -8,7 +8,7 @@ import { RULE_CONTEXTS, RULE_STRENGTHS } from "@/content/rules";
 import { dataBg } from "@/lib/dataColors";
 import { STATE_LABEL, formatShort, isActive, matchedEntities, ruleStateAt, stateAt } from "@/lib/rules";
 import { cn } from "@/lib/utils";
-import { ChangeTag, ConfirmFlag, ContextTag, Highlight, StateMarker, StatusLabel } from "./shared";
+import { ChangeTag, ConfirmFlag, ContextTag, EditedTag, Highlight, StateMarker, StatusLabel } from "./shared";
 
 const sectionTag = (r: RuleRecord) => (r.section.startsWith("WS") ? "Session" : `§${r.section}`);
 
@@ -52,6 +52,7 @@ export const RulesCards = React.memo(function RulesCards({
                 <StateMarker state={ruleStateAt(r, asOf)} />
                 <span className="min-w-0 flex-1 truncate t-body-sm text-muted">
                   {isActive(r, asOf) ? `Active since ${formatShort(stateAt(r, asOf)!.from)}` : `Inactive · ${STATE_LABEL[ruleStateAt(r, asOf)]}`}
+                  {r.edited && " · Edited"}
                 </span>
                 <span className="flex shrink-0 gap-1" aria-label={r.contexts.map((c) => RULE_CONTEXTS[c].label).join(", ")}>
                   {r.contexts.map((c) => (
@@ -89,6 +90,7 @@ export const RulesCards = React.memo(function RulesCards({
                     </span>
                     {" · "}
                     {sectionTag(r)}
+                    {r.edited && <EditedTag className="ml-2 align-middle" />}
                   </span>
                   <span>
                     {RULE_STRENGTHS[r.strength].label} · {r.owner}

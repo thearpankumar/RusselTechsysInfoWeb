@@ -9,7 +9,7 @@ import type { RuleRecord } from "@/content/types-extra";
 import { RULE_STRENGTHS, ruleSectionLabel } from "@/content/rules";
 import { SORT_LABEL, matchedEntities, type RuleSortKey, type SortDir } from "@/lib/rules";
 import { cn } from "@/lib/utils";
-import { ChangeTag, ConfirmFlag, ContextTag, Highlight, StatusLabel, keepArrows, useOverflowX } from "./shared";
+import { ChangeTag, ConfirmFlag, ContextTag, EditedTag, Highlight, StatusLabel, keepArrows, useOverflowX } from "./shared";
 
 /** Each column sorts by one or more keys (status shares a column with the active period it is derived from). */
 const COLUMNS: { id: string; sorts: { key: RuleSortKey; label: string }[]; className: string }[] = [
@@ -102,7 +102,7 @@ export const RulesTable = React.memo(function RulesTable({
                     scope="col"
                     aria-sort={sorted ? (dir === "asc" ? "ascending" : "descending") : undefined}
                     className={cn(
-                      "z-20 border-b border-border bg-surface-raised px-4 py-3 align-top font-normal xl:sticky xl:top-0",
+                      "z-20 border-b border-border bg-surface-raised px-4 py-3 align-top font-normal xl:sticky xl:top-(--section-tabs-h)",
                       i === 0 && "sticky left-0 z-30 rounded-tl-xl pl-6",
                       i === COLUMNS.length - 1 && "rounded-tr-xl",
                       c.className
@@ -138,6 +138,7 @@ export const RulesTable = React.memo(function RulesTable({
                       <Highlight text={r.id} tokens={tokens} />
                     </span>
                     <span className="mt-1 block t-mono-sm text-muted">{r.section.startsWith("WS") ? "Session" : `§${r.section}`}</span>
+                    {r.edited && <EditedTag className="mt-2" />}
                   </td>
                   <td className={cell}>
                     <button
@@ -147,7 +148,7 @@ export const RulesTable = React.memo(function RulesTable({
                         e.stopPropagation();
                         onOpen(r.id);
                       }}
-                      className="cursor-pointer scroll-mt-24 text-left t-body-md text-on-surface underline-offset-4 hover:underline"
+                      className="cursor-pointer scroll-mt-40 text-left t-body-md text-on-surface underline-offset-4 hover:underline"
                     >
                       <Highlight text={r.title} tokens={tokens} />
                     </button>

@@ -3,17 +3,18 @@
 // Rule detail as a side panel (non-modal "side peek"): the list stays visible and clickable, so prev/next and
 // clicking another row visibly walk the register. Leads with the rule as written, then its state history,
 // details, open questions, replacements and same-section rules. ←/→ or j/k step; Esc closes and returns focus.
+// "Edit dates" turns the state history into editable rows (state + date); edits are saved in this browser.
 import * as React from "react";
 import Link from "next/link";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { Check, ChevronLeft, ChevronRight, Link2, X } from "lucide-react";
-import type { RuleRecord } from "@/content/types-extra";
-import { RULE_ORIGINS, RULE_STRENGTHS, ruleRegister, ruleSectionLabel } from "@/content/rules";
+import { Check, ChevronLeft, ChevronRight, Link2, Pencil, Plus, X } from "lucide-react";
+import type { RuleLifecycle, RuleRecord, RuleStateChange } from "@/content/types-extra";
+import { RULE_ORIGINS, RULE_STATE_ORDER, RULE_STRENGTHS, ruleRegister, ruleSectionLabel } from "@/content/rules";
 import { openQuestions } from "@/content/openQuestions";
-import { Button, Cite, ConfidenceTag, IconButton, Marker } from "@/components/ui-rt";
-import { STATE_LABEL, formatDate, pendingQuestions, stateAt } from "@/lib/rules";
+import { Button, Cite, ConfidenceTag, IconButton, Marker, buttonClasses } from "@/components/ui-rt";
+import { STATE_LABEL, addDays, formatDate, pendingQuestions, stateAt, suggestNextState, validateHistory } from "@/lib/rules";
 import { cn } from "@/lib/utils";
-import { ChangeTag, ContextTag, SampleTag, StateMarker, StatusLabel } from "./shared";
+import { ChangeTag, ContextTag, DateField, EditedTag, SampleTag, StateMarker, StatusLabel } from "./shared";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -37,6 +38,69 @@ function RuleLink({ rule, onOpen }: { rule: RuleRecord; onOpen: (id: string) => 
   );
 }
 
+/** Editable state history: one row per state (state + start date), add or remove rows, validated before saving. */
+function HistoryEditor({ rule, onSave, onCancel }: { rule: RuleRecord; onSave: (history: RuleStateChange[]) => void; onCancel: () => void }) {
+  const [rows, setRows] = React.useState<RuleStateChange[]>(() => rule.history.map((h) => ({ ...h })));
+  const error = validateHistory(rows, rule);
+  const unchanged = rows.length === rule.history.length && rows.every((h, i) => h.state === rule.history[i].state && h.from === rule.history[i].from);
+  const states = RULE_STATE_ORDER.filter((st) => st !== "superseded" || rule.supersededBy);
+  const set = (i: number, patch: Partial<RuleStateChange>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const add = () =>
+    setRows((rs) => {
+      const last = rs[rs.length - 1];
+      return [...rs, { state: suggestNextState(last.state), from: addDays(last.from, 7) }];
+    });
+
+  return (
+    <div className="mt-4 rounded-lg border border-border p-4" role="group" aria-label={`Edit the dates of ${rule.id}`}>
+      <p className="t-body-sm text-muted">
+        Set when each state starts; dates must move forward. Saved in this browser only. The Excel download carries them, highlighted yellow.
+      </p>
+      <ol className="mt-4 flex flex-col gap-2">
+        {rows.map((h, i) => (
+          <li key={i} className="flex flex-wrap items-center gap-2">
+            <StateMarker state={h.state} />
+            <select
+              aria-label={`State ${i + 1}`}
+              value={h.state}
+              // A different state no longer matches the published note, so drop it.
+              onChange={(e) => set(i, { state: e.target.value as RuleLifecycle, note: undefined })}
+              className="h-10 cursor-pointer rounded-full border border-border bg-background px-3 t-body-md text-on-surface transition-colors duration-150 hover:border-chart-past focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              {states.map((st) => (
+                <option key={st} value={st}>
+                  {STATE_LABEL[st]}
+                </option>
+              ))}
+            </select>
+            <span className="inline-flex h-10 items-center rounded-full border border-border px-3 transition-colors duration-150 hover:border-chart-past has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-primary">
+              <DateField id={`edit-${rule.id}-${i}`} value={h.from} onChange={(d) => set(i, { from: d })} label={`${STATE_LABEL[h.state]} from`} />
+            </span>
+            {rows.length > 1 && <IconButton label={`Remove ${STATE_LABEL[h.state]}`} icon={<X />} onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} />}
+          </li>
+        ))}
+      </ol>
+      <Button variant="ghost" size="sm" icon={<Plus aria-hidden />} onClick={add} className="mt-2">
+        Add a state change
+      </Button>
+      {error && (
+        <p role="alert" className="mt-3 flex items-start gap-2 t-body-sm text-on-surface">
+          <Marker shape="hatch" size={8} className="mt-1.5" />
+          {error}
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="primary" size="sm" disabled={!!error || unchanged} onClick={() => onSave(rows)}>
+          Save dates
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function RulePanel({
   rule,
   asOf,
@@ -47,6 +111,8 @@ export function RulePanel({
   onPrev,
   onNext,
   onOpenRule,
+  onSaveHistory,
+  onResetHistory,
   onCloseAutoFocus,
 }: {
   rule: RuleRecord | null;
@@ -58,11 +124,18 @@ export function RulePanel({
   onPrev?: () => void;
   onNext?: () => void;
   onOpenRule: (id: string) => void;
+  /** Save an edited state history for a rule (kept in this browser). */
+  onSaveHistory: (id: string, history: RuleStateChange[]) => void;
+  /** Drop a rule's edits (back to the published dates). */
+  onResetHistory: (id: string) => void;
   /** Where focus goes when the panel closes (Radix would otherwise drop it on <body>). */
   onCloseAutoFocus?: (e: Event) => void;
 }) {
   const body = React.useRef<HTMLDivElement>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  // Which rule's dates are being edited (stepping to another rule leaves edit mode).
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const editButton = React.useRef<HTMLButtonElement>(null);
 
   // A new rule starts at the top, even if the last one was scrolled down.
   React.useEffect(() => {
@@ -71,7 +144,7 @@ export function RulePanel({
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const t = e.target as HTMLElement;
-    const typing = ["INPUT", "TEXTAREA"].includes(t.tagName);
+    const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName);
     if (!typing && (e.key === "ArrowLeft" || e.key === "k") && onPrev) {
       e.preventDefault();
       onPrev();
@@ -197,9 +270,40 @@ export function RulePanel({
                 </dl>
 
                 <section className="mt-8" aria-labelledby="rule-history">
-                  <h3 id="rule-history" className="t-label-caps text-muted">
-                    State history
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 id="rule-history" className="t-label-caps text-muted">
+                      State history
+                    </h3>
+                    {rule.edited && <EditedTag />}
+                    {editingId !== rule.id && (
+                      <span className="ml-auto flex flex-wrap gap-2">
+                        {rule.edited && (
+                          <Button variant="ghost" size="sm" onClick={() => onResetHistory(rule.id)}>
+                            Reset to published dates
+                          </Button>
+                        )}
+                        <button ref={editButton} type="button" onClick={() => setEditingId(rule.id)} className={buttonClasses({ size: "sm" })}>
+                          <Pencil aria-hidden />
+                          Edit dates
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                  {editingId === rule.id ? (
+                    <HistoryEditor
+                      key={rule.id}
+                      rule={rule}
+                      onSave={(history) => {
+                        onSaveHistory(rule.id, history);
+                        setEditingId(null);
+                        requestAnimationFrame(() => editButton.current?.focus());
+                      }}
+                      onCancel={() => {
+                        setEditingId(null);
+                        requestAnimationFrame(() => editButton.current?.focus());
+                      }}
+                    />
+                  ) : (
                   <ol className="mt-4 flex flex-col">
                     {rule.history.map((h, i) => {
                       const isCurrent = current?.from === h.from;
@@ -221,6 +325,13 @@ export function RulePanel({
                       );
                     })}
                   </ol>
+                  )}
+                  {rule.edited && rule.originalHistory && editingId !== rule.id && (
+                    <p className="t-body-sm text-muted">
+                      Published:{" "}
+                      {rule.originalHistory.map((h) => `${STATE_LABEL[h.state]} ${formatDate(h.from)}`).join(" → ")}
+                    </p>
+                  )}
                 </section>
 
                 {waits.length > 0 && (

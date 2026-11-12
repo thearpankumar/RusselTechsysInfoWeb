@@ -4,7 +4,7 @@
 // note on what is sample data.
 import * as React from "react";
 import { RULE_CONTEXTS, RULE_CONTEXT_ORDER, ruleRegister } from "@/content/rules";
-import type { RuleContext } from "@/content/types-extra";
+import type { RuleContext, RuleRecord } from "@/content/types-extra";
 import { Cite, ConfidenceTag, Stat, StatRow } from "@/components/ui-rt";
 import { dataBg } from "@/lib/dataColors";
 import { DEFAULT_QUERY, formatDate, isActive, needsConfirmation, type RuleQuery } from "@/lib/rules";
@@ -15,7 +15,7 @@ const contextCounts = Object.fromEntries(RULE_CONTEXT_ORDER.map((c) => [c, ruleR
 const maxContext = Math.max(...Object.values(contextCounts));
 const flagged = ruleRegister.filter(needsConfirmation).length;
 
-const FILTER_KEYS = ["q", "status", "state", "ctx", "sec", "str", "origin", "owner", "flag", "question", "changed"] as const;
+const FILTER_KEYS = ["q", "status", "state", "ctx", "sec", "str", "origin", "owner", "flag", "question", "changed", "edited"] as const;
 
 /** True when the filters are exactly `patch` (sort and as-of ignored). */
 function isPreset(q: RuleQuery, patch: Partial<RuleQuery>): boolean {
@@ -24,17 +24,20 @@ function isPreset(q: RuleQuery, patch: Partial<RuleQuery>): boolean {
 }
 
 export function RulesOverview({
+  rules,
   asOf,
   query,
   onPreset,
   onToggleContext,
 }: {
+  /** The register with this browser's date edits applied (status depends on dates). */
+  rules: RuleRecord[];
   asOf: string;
   query: RuleQuery;
   onPreset: (patch: Partial<RuleQuery>) => void;
   onToggleContext: (c: RuleContext) => void;
 }) {
-  const active = ruleRegister.filter((r) => isActive(r, asOf)).length;
+  const active = rules.filter((r) => isActive(r, asOf)).length;
   const when = formatDate(asOf);
 
   return (

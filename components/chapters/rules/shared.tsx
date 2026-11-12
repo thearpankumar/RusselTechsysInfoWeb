@@ -6,7 +6,7 @@ import type { RuleContext, RuleRecord } from "@/content/types-extra";
 import { RULE_CONTEXTS, REGISTER_AS_OF } from "@/content/rules";
 import { Marker } from "@/components/ui-rt";
 import { dataBg } from "@/lib/dataColors";
-import { STATE_LABEL, changeBetween, isActive, pendingQuestions, ruleStateAt, statusLine, todayISO, type RuleStateValue } from "@/lib/rules";
+import { AS_OF_MAX, AS_OF_MIN, STATE_LABEL, changeBetween, formatDate, isActive, isAsOfDate, pendingQuestions, ruleStateAt, statusLine, todayISO, type RuleStateValue } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
 const noop = () => () => {};
@@ -185,3 +185,67 @@ export function useOverflowX<T extends HTMLElement>(ref: React.RefObject<T | nul
 export const keepArrows = (e: React.KeyboardEvent) => {
   if (e.key === "ArrowLeft" || e.key === "ArrowRight") e.stopPropagation();
 };
+
+/** Keys a date field keeps: ←/→ move between its segments, Esc closes its picker (neither should reach the page). */
+export const keepDateKeys = (e: React.KeyboardEvent) => {
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Escape") e.stopPropagation();
+};
+
+/**
+ * Native date input (typing and the picker both work) that reads like the rest of the site at rest: "12 Nov 2026".
+ * While focused, the native segments show so the date can be typed. Styled by the `date-field` utility (app/theme.css).
+ */
+export function DateField({
+  id,
+  value,
+  onChange,
+  inputRef,
+  label,
+}: {
+  id: string;
+  value: string;
+  onChange: (iso: string) => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  /** Accessible name when there is no visible <label for>. */
+  label?: string;
+}) {
+  return (
+    <span className="relative inline-flex items-center">
+      <input
+        id={id}
+        ref={inputRef}
+        type="date"
+        value={value}
+        min={AS_OF_MIN}
+        max={AS_OF_MAX}
+        aria-label={label}
+        onChange={(e) => isAsOfDate(e.target.value) && onChange(e.target.value)}
+        onKeyDown={keepDateKeys}
+        // A click anywhere on the date opens the picker (typing still works once focused).
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker?.();
+          } catch {
+            /* not allowed here (e.g. in a cross-origin frame): the field still takes typing */
+          }
+        }}
+        className="peer date-field w-36 cursor-pointer bg-transparent t-mono-sm text-transparent outline-none focus:text-on-surface"
+      />
+      <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 flex items-center t-body-md whitespace-nowrap text-on-surface tnum peer-focus:hidden">
+        {formatDate(value)}
+      </span>
+    </span>
+  );
+}
+
+/** "Edited" tag: this rule's dates were changed in this browser (they show in exports, highlighted). */
+export function EditedTag({ className }: { className?: string }) {
+  return (
+    <span
+      title="Dates edited in this browser"
+      className={cn("inline-flex h-6 shrink-0 items-center rounded-full border border-chart-past bg-surface-raised px-2 t-mono-sm whitespace-nowrap text-on-surface", className)}
+    >
+      Edited
+    </span>
+  );
+}

@@ -4,25 +4,22 @@
 // dates; sort; view switch; download (Excel workbook of every rule, or CSV of the rows shown).
 import * as React from "react";
 import { Popover as PopoverPrimitive } from "radix-ui";
-import { ArrowDown, ArrowUp, ChartGantt, Check, ChevronDown, Download, FileSpreadsheet, FileText, LayoutGrid, Plus, RotateCcw, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChartGantt, Check, ChevronDown, Download, FileSpreadsheet, FileText, LayoutGrid, Pencil, Plus, RotateCcw, Rows3, Search, X } from "lucide-react";
 import type { RuleContext, RuleRecord } from "@/content/types-extra";
-import { RULE_CONTEXTS, ruleRegister } from "@/content/rules";
+import { RULE_CONTEXTS } from "@/content/rules";
 import { Button, Kbd, Marker, TabTrack } from "@/components/ui-rt";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { dataBg } from "@/lib/dataColors";
 import {
-  AS_OF_MAX,
-  AS_OF_MIN,
   FACETS,
   FACET_LABEL,
   FACET_OPTIONS,
   SORT_LABEL,
-  dayNumber,
+  addDays,
   facetCounts,
   flagCount,
   formatDate,
   hasFilters,
-  isAsOfDate,
   rulesToCsv,
   saveBlob,
   type FacetKey,
@@ -33,7 +30,7 @@ import {
 } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 import { FacetPill, type FacetPillOption } from "./FacetPill";
-import { StateMarker } from "./shared";
+import { DateField, StateMarker } from "./shared";
 import type { RulesState } from "./useRulesState";
 
 const isTyping = (t: EventTarget | null) => {
@@ -48,62 +45,22 @@ function facetMarker(facet: FacetKey, value: string): React.ReactNode {
   return undefined;
 }
 
-/** ISO date `days` before `iso`, kept inside the as-of range. */
-function shiftDate(iso: string, days: number): string {
-  const d = new Date((dayNumber(iso) + days) * 86_400_000);
-  const out = d.toISOString().slice(0, 10);
-  return out < AS_OF_MIN ? AS_OF_MIN : out > AS_OF_MAX ? AS_OF_MAX : out;
-}
-
 const pill = "inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-3 t-body-md transition-colors duration-150";
-
-/** Keys a date field keeps: ←/→ move between its segments, Esc closes its picker (neither should reach the page). */
-const keepDateKeys = (e: React.KeyboardEvent) => {
-  if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Escape") e.stopPropagation();
-};
-
-/**
- * Native date input (typing and the picker both work) that reads like the rest of the site at rest: "12 Nov 2026".
- * While focused, the native segments show so the date can be typed.
- */
-function DateField({ id, value, onChange, inputRef }: { id: string; value: string; onChange: (iso: string) => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
-  return (
-    <span className="relative inline-flex items-center">
-      <input
-        id={id}
-        ref={inputRef}
-        type="date"
-        value={value}
-        min={AS_OF_MIN}
-        max={AS_OF_MAX}
-        onChange={(e) => isAsOfDate(e.target.value) && onChange(e.target.value)}
-        onKeyDown={keepDateKeys}
-        // A click anywhere on the date opens the picker (typing still works once focused).
-        onClick={(e) => {
-          try {
-            e.currentTarget.showPicker?.();
-          } catch {
-            /* not allowed here (e.g. in a cross-origin frame): the field still takes typing */
-          }
-        }}
-        className="peer date-field w-36 cursor-pointer bg-transparent t-mono-sm text-transparent outline-none focus:text-on-surface"
-      />
-      <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 flex items-center t-body-md whitespace-nowrap text-on-surface tnum peer-focus:hidden">
-        {formatDate(value)}
-      </span>
-    </span>
-  );
-}
 
 export function RulesToolbar({
   state,
+  rules,
   counted,
   asOf,
   today,
   list,
   searchRef,
+  editCount,
+  onDiscardEdits,
 }: {
   state: RulesState;
+  /** The register with this browser's date edits applied. */
+  rules: RuleRecord[];
   /** Deferred query: facet counts trail typing like the list does. */
   counted: RuleQuery;
   /** As-of date the list is computed for. */
@@ -111,6 +68,9 @@ export function RulesToolbar({
   today: string;
   list: RuleRecord[];
   searchRef: React.RefObject<HTMLInputElement | null>;
+  /** Rules whose dates were edited in this browser. */
+  editCount: number;
+  onDiscardEdits: () => void;
 }) {
   const { query, setQuery, clearFilters, view, setView } = state;
   const { active } = useJourney();
@@ -135,12 +95,12 @@ export function RulesToolbar({
   const options = React.useMemo(() => {
     const out = {} as Record<FacetKey, FacetPillOption[]>;
     for (const f of FACETS) {
-      const counts = facetCounts(ruleRegister, counted, asOf, f);
+      const counts = facetCounts(rules, counted, asOf, f);
       out[f] = FACET_OPTIONS[f].map((o) => ({ ...o, count: counts.get(o.value) ?? 0, marker: facetMarker(f, o.value) }));
     }
     return out;
-  }, [counted, asOf]);
-  const flags = React.useMemo(() => flagCount(ruleRegister, counted, asOf), [counted, asOf]);
+  }, [rules, counted, asOf]);
+  const flags = React.useMemo(() => flagCount(rules, counted, asOf), [rules, counted, asOf]);
   const filtered = hasFilters(query);
 
   const clearAll = () => {
@@ -164,7 +124,7 @@ export function RulesToolbar({
               else searchRef.current?.blur();
             } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") e.stopPropagation();
           }}
-          placeholder={`Search ${ruleRegister.length} rules: ids, wording, contexts, entities…`}
+          placeholder={`Search ${rules.length} rules: ids, wording, contexts, entities…`}
           aria-label="Search the business rules"
           className="h-full min-w-0 flex-1 bg-transparent t-body-lg text-on-surface outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
         />
@@ -199,6 +159,18 @@ export function RulesToolbar({
           Needs confirmation
           <span className="tnum text-muted">{flags}</span>
         </button>
+        {(editCount > 0 || query.edited) && (
+          <button
+            type="button"
+            aria-pressed={query.edited}
+            onClick={() => setQuery({ edited: !query.edited })}
+            className={cn(pill, "cursor-pointer hover:border-chart-past hover:bg-surface-raised", query.edited ? "border-chart-past bg-surface-raised text-on-surface" : "border-dashed border-border text-body")}
+          >
+            <Pencil aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
+            Edited dates
+            <span className="tnum text-muted">{editCount}</span>
+          </button>
+        )}
         {query.question && (
           <span className={cn(pill, "border-chart-past bg-surface-raised pr-1 text-on-surface")}>
             <span className="text-muted">Waits on:</span> {query.question}
@@ -234,7 +206,7 @@ export function RulesToolbar({
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-border pt-4">
         <p role="status" aria-live="polite" className="t-body-md text-body">
-          <span className="tnum text-on-surface">{list.length}</span> of <span className="tnum">{ruleRegister.length}</span> rules
+          <span className="tnum text-on-surface">{list.length}</span> of <span className="tnum">{rules.length}</span> rules
         </p>
 
         {/* As of: status is computed for this day. The reset sits inside the pill, so nothing moves. */}
@@ -282,7 +254,7 @@ export function RulesToolbar({
             ref={compareButton}
             type="button"
             onClick={() => {
-              setQuery({ vs: shiftDate(liveAsOf, -42) });
+              setQuery({ vs: addDays(liveAsOf, -42) });
               requestAnimationFrame(() => vsInput.current?.focus());
             }}
             className={cn(pill, "cursor-pointer border-dashed border-border text-body hover:border-chart-past hover:bg-surface-raised")}
@@ -290,6 +262,21 @@ export function RulesToolbar({
             <Plus aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
             Compare dates
           </button>
+        )}
+
+        {editCount > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (window.confirm(`Discard the date edits on ${editCount} ${editCount === 1 ? "rule" : "rules"}? This cannot be undone.`)) {
+                onDiscardEdits();
+                searchRef.current?.focus();
+              }
+            }}
+          >
+            Discard {editCount} {editCount === 1 ? "edit" : "edits"}
+          </Button>
         )}
 
         <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
@@ -305,7 +292,7 @@ export function RulesToolbar({
               { value: "timeline", label: "Timeline", icon: <ChartGantt aria-hidden /> },
             ]}
           />
-          <DownloadMenu query={query} asOf={asOf} list={list} />
+          <DownloadMenu rules={rules} query={query} asOf={asOf} list={list} editCount={editCount} />
         </div>
       </div>
     </div>
@@ -379,7 +366,7 @@ function SortMenu({ sort, dir, onChange }: { sort: RuleSortKey; dir: "asc" | "de
 
 const loadExcel = () => import("@/lib/rulesExcel");
 
-function DownloadMenu({ query, asOf, list }: { query: RuleQuery; asOf: string; list: RuleRecord[] }) {
+function DownloadMenu({ rules, query, asOf, list, editCount }: { rules: RuleRecord[]; query: RuleQuery; asOf: string; list: RuleRecord[]; editCount: number }) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -388,7 +375,7 @@ function DownloadMenu({ query, asOf, list }: { query: RuleQuery; asOf: string; l
     setError(null);
     try {
       const { downloadRulesWorkbook } = await loadExcel();
-      saveBlob(await downloadRulesWorkbook({ asOf, query, shown: list }), `rossell-business-rules-${asOf}.xlsx`);
+      saveBlob(await downloadRulesWorkbook({ rules, asOf, query, shown: list }), `rossell-business-rules-${asOf}.xlsx`);
     } catch {
       setError("The workbook could not be built. Try the CSV instead.");
     } finally {
@@ -425,7 +412,10 @@ function DownloadMenu({ query, asOf, list }: { query: RuleQuery; asOf: string; l
             <FileSpreadsheet aria-hidden className="mt-0.5 size-5 shrink-0 text-muted" strokeWidth={1.5} />
             <span className="flex flex-col">
               <span className="t-body-md text-on-surface">{busy ? "Preparing workbook…" : "Excel workbook (.xlsx)"}</span>
-              <span className="t-body-sm text-muted">All {ruleRegister.length} rules with state history, open questions and contexts; status as of {formatDate(asOf)}.</span>
+              <span className="t-body-sm text-muted">
+                All {rules.length} rules with state history, open questions and contexts; status as of {formatDate(asOf)}.
+                {editCount > 0 && ` Your ${editCount} edited ${editCount === 1 ? "rule is" : "rules are"} highlighted yellow.`}
+              </span>
             </span>
           </button>
           <button type="button" onClick={csv} disabled={!list.length} className={item}>

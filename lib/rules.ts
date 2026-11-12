@@ -10,6 +10,7 @@ import {
   RULE_STATES,
   RULE_STATE_ORDER,
   RULE_STRENGTHS,
+  activeSpan,
   ruleRegister,
   ruleSectionLabel,
 } from "@/content/rules";
@@ -138,6 +139,60 @@ export function changesInWindow(rules: RuleRecord[], from: string, to: string): 
   return out.sort((a, b) => b.change.from.localeCompare(a.change.from) || a.rule.order - b.rule.order);
 }
 
+/* ---------- local date edits ---------- */
+
+/** Edited histories by rule id (kept in this browser; see components/chapters/rules/useRuleEdits.ts). */
+export type RuleEdits = Record<string, RuleStateChange[]>;
+
+/** The register with local edits applied: new history, re-derived active span, flagged as edited. */
+export function applyEdits(rules: RuleRecord[], edits: RuleEdits): RuleRecord[] {
+  if (!Object.keys(edits).length) return rules;
+  return rules.map((r) => {
+    const h = edits[r.id];
+    if (!h) return r;
+    // Set both span fields explicitly: an edit can make a rule never active (both undefined).
+    const span = activeSpan(h);
+    return { ...r, history: h, activeFrom: span.activeFrom, activeTo: span.activeTo, edited: true, originalHistory: r.history };
+  });
+}
+
+/** Why an edited history cannot be saved, or null when it is fine. */
+export function validateHistory(h: RuleStateChange[], r: RuleRecord): string | null {
+  if (!h.length) return "Keep at least one state.";
+  for (let i = 0; i < h.length; i++) {
+    const { state, from } = h[i];
+    if (!has(RULE_STATES, state)) return "Pick a state for every row.";
+    if (!isAsOfDate(from)) return `Dates must be real dates between ${formatDate(AS_OF_MIN)} and ${formatDate(AS_OF_MAX)}.`;
+    if (i > 0 && from <= h[i - 1].from)
+      return `Dates must move forward: ${STATE_LABEL[state]} (${formatDate(from)}) has to come after ${STATE_LABEL[h[i - 1].state]} (${formatDate(h[i - 1].from)}).`;
+    if (i > 0 && state === h[i - 1].state) return `${STATE_LABEL[state]} appears twice in a row; remove one or change its state.`;
+    if (state === "superseded" && !r.supersededBy) return "Only a rule with a replacement can be superseded; use Retired instead.";
+  }
+  return null;
+}
+
+/** A sensible state to add after `last` (the editor's "Add a state change"). */
+export function suggestNextState(last: RuleLifecycle): RuleLifecycle {
+  switch (last) {
+    case "draft":
+      return "review";
+    case "review":
+      return "approved";
+    case "approved":
+      return "active";
+    case "active":
+      return "retired";
+    default:
+      return "active";
+  }
+}
+
+/** ISO date `days` after `iso`, kept inside the as-of range. */
+export function addDays(iso: string, days: number): string {
+  const out = new Date((dayNumber(iso) + days) * 86_400_000).toISOString().slice(0, 10);
+  return out < AS_OF_MIN ? AS_OF_MIN : out > AS_OF_MAX ? AS_OF_MAX : out;
+}
+
 /* ---------- query ---------- */
 
 export type RuleStatusValue = "active" | "inactive";
@@ -166,6 +221,8 @@ export interface RuleQuery {
   vs: string | null;
   /** With `vs`: only rules whose state differs between the two dates. */
   changed: boolean;
+  /** Only rules whose dates were edited in this browser. */
+  edited: boolean;
   sort: RuleSortKey;
   dir: SortDir;
 }
@@ -184,13 +241,14 @@ export const DEFAULT_QUERY: RuleQuery = {
   asOf: null,
   vs: null,
   changed: false,
+  edited: false,
   sort: "id",
   dir: "asc",
 };
 
 /** True when any filter (not sort, not dates) narrows the list. */
 export const hasFilters = (q: RuleQuery) =>
-  !!(q.q.trim() || FACETS.some((f) => (q[f] as string[]).length) || q.flag || q.question || (q.vs && q.changed));
+  !!(q.q.trim() || FACETS.some((f) => (q[f] as string[]).length) || q.flag || q.question || q.edited || (q.vs && q.changed));
 
 export const FACET_LABEL: Record<FacetKey, string> = {
   status: "Status",
@@ -285,6 +343,7 @@ export function filterRules(rules: RuleRecord[], q: RuleQuery, asOf: string, exc
     if (q.flag && except !== "flag" && !needsConfirmation(r)) return false;
     if (q.question && !(r.questions ?? []).includes(q.question)) return false;
     if (q.vs && q.changed && !changeBetween(r, q.vs, asOf)) return false;
+    if (q.edited && !r.edited) return false;
     for (const f of facets) {
       const want = q[f] as string[];
       if (!facetValues(r, f, asOf).some((v) => want.includes(v))) return false;
@@ -372,7 +431,7 @@ export function sortRules(rules: RuleRecord[], key: RuleSortKey, dir: SortDir, a
 /* ---------- URL state ---------- */
 
 const LIST_PARAMS: Record<FacetKey, string> = { status: "status", state: "state", ctx: "ctx", sec: "sec", str: "str", origin: "src", owner: "own" };
-export const RULE_PARAMS = ["q", ...Object.values(LIST_PARAMS), "flag", "question", "asOf", "vs", "changed", "sort", "dir", "view", "rule"];
+export const RULE_PARAMS = ["q", ...Object.values(LIST_PARAMS), "flag", "question", "asOf", "vs", "changed", "edited", "sort", "dir", "view", "rule"];
 
 const VIEWS: RuleView[] = ["table", "cards", "timeline"];
 
@@ -401,6 +460,7 @@ export function parseRuleQuery(params: URLSearchParams): RuleQuery {
     asOf: isAsOfDate(asOf) ? asOf : null,
     vs: isAsOfDate(vs) ? vs : null,
     changed: params.get("changed") === "1",
+    edited: params.get("edited") === "1",
     sort: sort && has(SORT_LABEL, sort) ? (sort as RuleSortKey) : "id",
     dir: params.get("dir") === "desc" ? "desc" : "asc",
   };
@@ -421,6 +481,7 @@ export function writeRuleParams(params: URLSearchParams, q: RuleQuery, view: Rul
   if (q.asOf) params.set("asOf", q.asOf);
   if (q.vs) params.set("vs", q.vs);
   if (q.vs && q.changed) params.set("changed", "1");
+  if (q.edited) params.set("edited", "1");
   if (q.sort !== "id") params.set("sort", q.sort);
   if (q.dir !== "asc") params.set("dir", q.dir);
   if (view !== "table") params.set("view", view);
@@ -433,13 +494,15 @@ export interface TimelineAxis {
   start: number;
   end: number;
   ticks: { day: number; label: string }[];
+  /** Months on the axis (each gets a fixed width, so a long range scrolls instead of squashing). */
+  months: number;
 }
 
 /** Shared month axis: the month before the first history date → two months after the latest date (incl. as-of / vs). */
-export function timelineDomain(asOf: string, vs?: string | null): TimelineAxis {
+export function timelineDomain(rules: RuleRecord[], asOf: string, vs?: string | null): TimelineAxis {
   let min = asOf;
   let max = asOf;
-  for (const d of [...ruleRegister.flatMap((r) => r.history.map((h) => h.from)), ...(vs ? [vs] : [])]) {
+  for (const d of [...rules.flatMap((r) => r.history.map((h) => h.from)), ...(vs ? [vs] : [])]) {
     if (d < min) min = d;
     if (d > max) max = d;
   }
@@ -451,9 +514,9 @@ export function timelineDomain(asOf: string, vs?: string | null): TimelineAxis {
   for (let m = startMonth; m <= endMonth; m++) {
     const y = Math.floor(m / 12);
     const mo = m % 12;
-    ticks.push({ day: dayNumber(`${y}-${String(mo + 1).padStart(2, "0")}-01`), label: mo === 0 || m === startMonth ? `${MONTHS[mo]} ${y}` : MONTHS[mo] });
+    ticks.push({ day: dayNumber(`${y}-${String(mo + 1).padStart(2, "0")}-01`), label: mo === 0 || m === startMonth ? `${MONTHS[mo]} ’${String(y).slice(2)}` : MONTHS[mo] });
   }
-  return { start: ticks[0].day, end: ticks[ticks.length - 1].day, ticks };
+  return { start: ticks[0].day, end: ticks[ticks.length - 1].day, ticks, months: ticks.length - 1 };
 }
 
 /* ---------- exports ---------- */
@@ -474,7 +537,7 @@ const csvCell = (v: string) => {
 
 /** CSV of the rules as shown (filtered and sorted), with the as-of status. */
 export function rulesToCsv(rules: RuleRecord[], asOf: string): string {
-  const head = ["ID", "Title", "Rule", "Status", `State on ${asOf}`, "Active from", "Active to", "Contexts", "Section", "Strength", "Owner", "Source", "Waits on", "Superseded by", "Entities", "State history", "Source ids", "Metadata"];
+  const head = ["ID", "Title", "Rule", "Status", `State on ${asOf}`, "Active from", "Active to", "Contexts", "Section", "Strength", "Owner", "Source", "Waits on", "Superseded by", "Entities", "State history", "Dates edited", "Source ids", "Metadata"];
   const rows = rules.map((r) => [
     r.id,
     r.title,
@@ -492,6 +555,7 @@ export function rulesToCsv(rules: RuleRecord[], asOf: string): string {
     r.supersededBy ?? "",
     (r.entities ?? []).join("; "),
     historyText(r),
+    r.edited ? "Yes (in this browser)" : "",
     r.sources.join("; "),
     "Sample state history, contexts and owner",
   ]);

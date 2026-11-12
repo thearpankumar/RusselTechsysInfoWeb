@@ -37,17 +37,27 @@ export function useRulesState() {
     setState({ query: parseRuleQuery(params), view, openId: rule && getRule(rule) ? rule : null, ready: true });
   }, []);
 
-  // Mirror into the URL (debounced, so typing does not flood the history API).
+  // Mirror into the URL. Clicks (filters, sort, view, dates, open rule) are written at once; only typing in the
+  // search box is debounced. A delayed write after a click could land while a tab link is navigating and pull the
+  // URL back to this section, cancelling the navigation.
+  const lastQ = React.useRef(state.query.q);
   React.useEffect(() => {
     if (!state.ready) return;
-    const t = window.setTimeout(() => {
+    const write = () => {
       const url = new URL(window.location.href);
       writeRuleParams(url.searchParams, state.query, state.view, state.openId);
       const next = url.pathname + url.search + url.hash;
       if (next !== window.location.pathname + window.location.search + window.location.hash) {
         window.history.replaceState(null, "", next);
       }
-    }, 250);
+    };
+    const typing = state.query.q !== lastQ.current;
+    lastQ.current = state.query.q;
+    if (!typing) {
+      write();
+      return;
+    }
+    const t = window.setTimeout(write, 250);
     return () => window.clearTimeout(t);
   }, [state]);
 

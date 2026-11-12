@@ -374,6 +374,10 @@ export interface RuleRecord extends Sourced {
   entities?: string[];
   /** OpenQuestion ids this rule waits on ("Needs confirmation"). */
   questions?: string[];
+  /** Runtime only: the dates were edited in this browser (components/chapters/rules/useRuleEdits.ts). */
+  edited?: boolean;
+  /** Runtime only: the history as published, when edited. */
+  originalHistory?: RuleStateChange[];
 }
 
 export interface SystemFact extends Sourced {

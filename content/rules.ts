@@ -215,7 +215,7 @@ function historyFor(d: Draft): RuleStateChange[] {
 }
 
 /** First active date, and the end of the last active span (if it has ended). */
-function activeSpan(history: RuleStateChange[]): { activeFrom?: string; activeTo?: string } {
+export function activeSpan(history: RuleStateChange[]): { activeFrom?: string; activeTo?: string } {
   const first = history.findIndex((h) => h.state === "active");
   if (first < 0) return {};
   let last = first;
