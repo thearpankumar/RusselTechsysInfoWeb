@@ -128,7 +128,7 @@ function RevenueLadder({ onOpen }: { onOpen: (id: string) => void }) {
     <ChartFrame
       eyebrow="Size"
       title={`${sizeHeadline}: ₹${cr0(rossellRev)} Cr against ₹${cr0(indianMin)}–${cr0(indianMax)} Cr`}
-      subtitle="Latest full-year revenue in ₹ Cr, largest first; Rossell is the white bar."
+      subtitle="Latest full-year revenue in ₹ Cr, largest first; Rossell is the highlighted bar."
       footer={
         <>
           <span className="t-body-sm text-muted">FY26 for Indian companies; CY2025 for global, converted at ₹87/US$ and ₹98.57/€. Companies with no reliable revenue figure are left out.</span>
@@ -199,7 +199,7 @@ function PositionCards({ onShare }: { onShare: () => void }) {
       <ChartFrame
         eyebrow="Breadth"
         title={`${rossell.services.length} of ${COMPETITOR_SERVICES.length} services, against a peer median of ${fmtNum(peerMedian, 1)}`}
-        subtitle="Count of the twelve services in the matrix each company offers; white is Rossell, grey is the peer median."
+        subtitle="Count of the twelve services in the matrix each company offers; Rossell is highlighted, grey is the peer median."
         footer={
           <>
             <span className="t-body-sm text-muted">Not offered: {rossellMissing.map((s) => s.label).join(", ")}.</span>
@@ -325,7 +325,7 @@ export default function Competition() {
         <div id="comp-services" className="scroll-mt-24">
           <ChartFrame
             title="Who offers what"
-            subtitle="A white dot means the company offers the service; Rossell is the first row."
+            subtitle="A highlighted dot means the company offers the service; Rossell is the first row."
             footer={<FactMeta sources={[...new Set(allCompetitors.flatMap((c) => c.sources))]} className="ml-auto" />}
           >
             <ServicesTable rows={rows} onOpen={ov.openId} />

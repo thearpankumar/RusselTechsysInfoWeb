@@ -225,14 +225,14 @@ export default function Financials() {
   const chart = {
     annual: {
       title: "Revenue by year",
-      subtitle: "Each bar is a year's revenue in ₹ Cr; the white bar is the first half of FY27 alone, already 70% of FY26.",
+      subtitle: "Each bar is a year's revenue in ₹ Cr; the highlighted bar is the first half of FY27 alone, already 70% of FY26.",
       data: annualBars,
       onClick: (_: BarDatum, i: number) => openPeriod(annual[i].id),
       sources: ["S44", "S29", "S41"],
     },
     quarterly: {
       title: "Revenue by quarter",
-      subtitle: "Six quarters in ₹ Cr; the white bar is the latest quarter, the best in the company's history.",
+      subtitle: "Six quarters in ₹ Cr; the highlighted bar is the latest quarter, the best in the company's history.",
       data: quarterBars,
       onClick: (_: BarDatum, i: number) => openPeriod(quarterly[i].id),
       sources: ["DECK-SC", "S39", "S30", "S92"],
@@ -424,7 +424,7 @@ export default function Financials() {
           <ChartFrame
             eyebrow="Borrowings"
             title="Debt nearly doubled in eighteen months"
-            subtitle="₹ Cr at each balance-sheet date; the white bar is the latest, before the ₹300 Cr raise repays part of it."
+            subtitle="₹ Cr at each balance-sheet date; the highlighted bar is the latest, before the ₹300 Cr raise repays part of it."
             className="h-full"
             footer={<FactMeta sources={["S59", "R-scl-2", "S40"]} />}
           >

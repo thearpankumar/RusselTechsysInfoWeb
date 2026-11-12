@@ -115,6 +115,53 @@
   --data-8: var(--color-data-moss);
 }
 
+/* ---------- Light theme ----------
+   Opt-in via <html data-theme="light"> (set by the toggle in the chapter rail, persisted in
+   localStorage, applied pre-paint by the inline script in app/layout.tsx). Dark stays the default.
+   Same roles as the dark tokens: surfaces off-white (never #FFF), emphasis = warm near-black,
+   chart ramp runs light grey -> near-black, data palette darkened for contrast on light. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-canvas: #f1f0ea;
+  --color-background: #f7f6f1;
+  --color-surface: #fdfcf8;
+  --color-surface-raised: #e6e4dc;
+  --color-border: #d9d7cf;
+
+  --color-on-surface: #191818;
+  --color-body: #3a3937;
+  --color-muted: #5d636a;
+
+  --color-primary: #191818;
+  --color-on-primary: #fefdf8;
+
+  --color-chart-past: #cdcbc3;
+  --color-chart-mid: #77756f; /* dark enough for on-primary labels (HeatCell, Clients) at 4.5:1 */
+  --color-chart-light: #5a5955;
+
+  --color-data-sage: #5f7d5e;
+  --color-data-slate: #5d6c94;
+  --color-data-tan: #92704b;
+  --color-data-lavender: #7d6a95;
+  --color-data-olive: #8a7f43;
+  --color-data-teal: #4f7d79;
+  --color-data-rose: #8f5f68;
+  --color-data-moss: #6f764a;
+
+  /* Light scrim, one step below the surfaces so dialogs separate from the backdrop; photo captions stay dark-on-light. */
+  --color-scrim: #dcdad2;
+
+  --color-foreground: #191818;
+  --color-popover: #f7f6f1;
+  --color-popover-foreground: #191818;
+  --color-ring: #191818;
+  --color-input: #d9d7cf;
+  --color-accent: #e6e4dc;
+  --color-accent-foreground: #191818;
+  --color-muted-foreground: #5d636a;
+}
+
 /* ---------- Typography scale (DESIGN.md typography tokens) ---------- */
 
 @utility t-headline-display {

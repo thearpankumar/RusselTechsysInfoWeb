@@ -299,7 +299,7 @@ export function FootprintBody({ map }: { map: WorldMapData }) {
         <div id="footprint-area" className="scroll-mt-24">
           <ChartFrame
             title="Floor area, 2011 to today"
-            subtitle="Built-up square feet in Bengaluru at each disclosure; the white bar adds the new 210,000 sq ft unit. Select a bar for the source."
+            subtitle="Built-up square feet in Bengaluru at each disclosure; the highlighted bar adds the new 210,000 sq ft unit. Select a bar for the source."
             footer={
               <>
                 <Cite ids={["R-scl-17", "R-scl-9", "R-scl-8", "R-scl-7", "R-scl-24"]} max={5} />

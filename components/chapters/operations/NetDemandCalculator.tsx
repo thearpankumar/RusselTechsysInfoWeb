@@ -49,7 +49,7 @@ export function NetDemandCalculator() {
     <ChartFrame
       eyebrow="Net demand"
       title="How much to buy, worked through"
-      subtitle="Move the sliders: the bar shows how much of the demand is already covered, and the white part is what still has to be bought."
+      subtitle="Move the sliders: the bar shows how much of the demand is already covered, and the highlighted part is what still has to be bought."
       action={
         changed ? (
           <Button size="sm" icon={<RotateCcw />} onClick={() => setV(DEFAULTS)}>

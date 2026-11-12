@@ -128,7 +128,7 @@ export default function Growth() {
         <div id="growth-order-book" className="grid scroll-mt-24 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,8fr)_minmax(0,4fr)]">
           <ChartFrame
             title="Confirmed order book"
-            subtitle="₹ Cr of confirmed POs (purchase orders) at each disclosure; hollow dots are 'over' or approximate figures, white is the latest."
+            subtitle="₹ Cr of confirmed POs (purchase orders) at each disclosure; hollow dots are 'over' or approximate figures, the highlighted dot is the latest."
             footer={
               <>
                 <span className="t-body-sm text-muted">Click a point for the exact wording</span>
@@ -255,7 +255,7 @@ export default function Growth() {
             <div className="max-w-2xl">
               <p className="mb-3 t-label-caps text-muted">Working capital</p>
               <h3 className="t-headline-md text-on-surface">Inventory months, falling towards four</h3>
-              <p className="mt-2 t-body-md text-muted">Months of consumption covered by stock on hand; white is the latest, the last stop is the indicative aim.</p>
+              <p className="mt-2 t-body-md text-muted">Months of consumption covered by stock on hand; the highlighted stop is the latest, the last stop is the indicative aim.</p>
             </div>
             <Stat label="Q2 FY27" value="6.67" unit="months" sub="From 7.98 a year earlier" meta={<FactMeta sources={["S42", "DECK-SC"]} />} onClick={() => openInfo("inventory")} />
           </div>

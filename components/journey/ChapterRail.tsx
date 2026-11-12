@@ -13,6 +13,7 @@ import { TalenciaMark } from "./TalenciaMark";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useJourney } from "./JourneyProvider";
+import { ThemeToggle } from "./ThemeToggle";
 
 /** Rail width — main content must offset by the same amount on desktop (see JourneyMain: lg:pl-64 / lg:pl-18). */
 export const RAIL_WIDTH_CLASS = "lg:w-64";
@@ -277,7 +278,8 @@ export function ChapterRail() {
             <nav aria-label="Chapters" data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
               <CompactNavList />
             </nav>
-            <div className="flex justify-center border-t border-border py-3">
+            <div className="flex flex-col items-center gap-1 border-t border-border py-3">
+              <ThemeToggle compact />
               <SignOutButton compact />
             </div>
           </>
@@ -332,7 +334,8 @@ export function ChapterRail() {
                 <button type="button" onClick={togglePresent} className={cn("inline-flex cursor-pointer items-center gap-2 rounded-sm hover:text-body", focusRing)}>
                   <Kbd>P</Kbd> present
                 </button>
-                <span className="-my-2 ml-auto -mr-2">
+                <span className="-my-2 ml-auto -mr-2 flex items-center">
+                  <ThemeToggle compact />
                   <SignOutButton compact />
                 </span>
               </div>
@@ -367,8 +370,9 @@ export function ChapterRail() {
           <nav aria-label="Chapters" className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
             <NavList compact onNavigate={() => setMenuOpen(false)} />
           </nav>
-          <div className="border-t border-border px-4 py-3">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
             <SignOutButton />
+            <ThemeToggle />
           </div>
         </SheetContent>
       </Sheet>
