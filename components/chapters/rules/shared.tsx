@@ -242,10 +242,22 @@ export function DateField({
 export function EditedTag({ className }: { className?: string }) {
   return (
     <span
-      title="Dates edited in this browser"
+      title="Changed in this browser"
       className={cn("inline-flex h-6 shrink-0 items-center rounded-full border border-chart-past bg-surface-raised px-2 t-mono-sm whitespace-nowrap text-on-surface", className)}
     >
       Edited
+    </span>
+  );
+}
+
+/** "Added" tag: a rule added in this browser (not part of the published register). */
+export function AddedTag({ className }: { className?: string }) {
+  return (
+    <span
+      title="Added in this browser"
+      className={cn("inline-flex h-6 shrink-0 items-center rounded-full border border-dashed border-chart-past px-2 t-mono-sm whitespace-nowrap text-on-surface", className)}
+    >
+      Added
     </span>
   );
 }

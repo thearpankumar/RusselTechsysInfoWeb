@@ -41,6 +41,7 @@ export const RULE_STRENGTHS: Record<RuleStrength, { label: string; blurb: string
 export const RULE_ORIGINS: Record<RuleOrigin, { label: string }> = {
   spec: { label: "Business-rules spec" },
   session: { label: "Working session" },
+  local: { label: "Added in this browser" },
 };
 
 /** Lifecycle states in their usual order. Only "active" counts as Active. */
@@ -89,12 +90,18 @@ export const SAMPLE_HISTORY = {
 type Batch = keyof typeof SAMPLE_HISTORY;
 
 export interface RuleSection {
-  /** "2.3", "WS-A". */
+  /** "2.3", "WS-A"; sections added in this browser are "S1", "S2", … */
   id: string;
   label: string;
-  /** Spec part the section belongs to (groups the Section filter). */
+  /** Spec part the section belongs to (groups the Section filter and the coverage matrix). */
   part: string;
-  batch: Batch;
+  /** Sample history batch (published sections only). */
+  batch?: Batch;
+  /** Runtime only: added in this browser. */
+  added?: boolean;
+  /** Runtime only: renamed or moved in this browser; `original` holds the published values. */
+  edited?: boolean;
+  original?: { label: string; part: string };
 }
 
 export const RULE_SECTIONS: RuleSection[] = [
@@ -123,12 +130,31 @@ export const RULE_SECTIONS: RuleSection[] = [
 ];
 
 const sectionById = new Map(RULE_SECTIONS.map((s) => [s.id, s]));
-export const getRuleSection = (id: string) => sectionById.get(id);
-/** "§2.3 BOM upload and replacement" / "Sessions · Allocation". */
+
+// Sections in use: the published list with this browser's changes (renamed, added, deleted), set by the
+// local-changes store (components/chapters/rules/useLocalRules.ts) whenever those change.
+let sectionsNow: RuleSection[] = RULE_SECTIONS;
+let sectionsNowById = sectionById;
+export const currentSections = () => sectionsNow;
+export function setCurrentSections(list: RuleSection[]) {
+  sectionsNow = list;
+  sectionsNowById = new Map(list.map((s) => [s.id, s]));
+}
+
+export const getRuleSection = (id: string) => sectionsNowById.get(id) ?? sectionById.get(id);
+/** "§2.3 BOM upload and replacement" / "Sessions · Allocation" / an added section's own name. */
 export const ruleSectionLabel = (id: string) => {
-  const s = sectionById.get(id);
+  const s = getRuleSection(id);
   if (!s) return id;
+  if (s.added) return s.label;
   return s.id.startsWith("WS") ? `Sessions · ${s.label}` : `§${s.id} ${s.label}`;
+};
+
+/** Short section tag for dense rows: "§2.3", "Session", or an added section's own name. */
+export const sectionShort = (id: string) => {
+  const s = getRuleSection(id);
+  if (s?.added) return s.label;
+  return id.startsWith("WS") ? "Session" : `§${id}`;
 };
 
 /* ---------- rules ---------- */

@@ -1,6 +1,6 @@
 // Business-rules register logic: lifecycle state on a date, compare two dates, search, facets, sort, URL state
 // and CSV. Pure; no React. Excel export lives in lib/rulesExcel.ts (lazy-loaded).
-import type { RuleContext, RuleLifecycle, RuleOrigin, RuleRecord, RuleStateChange, RuleStrength } from "@/content/types-extra";
+import type { LocalChanges, LocalRule, RuleContext, RuleDetails, RuleField, RuleLifecycle, RuleOrigin, RulePatch, RuleRecord, RuleStateChange, RuleStrength } from "@/content/types-extra";
 import {
   RULE_CONTEXTS,
   RULE_CONTEXT_ORDER,
@@ -8,10 +8,11 @@ import {
   RULE_OWNERS,
   RULE_SECTIONS,
   RULE_STATES,
+  currentSections,
+  type RuleSection,
   RULE_STATE_ORDER,
   RULE_STRENGTHS,
   activeSpan,
-  ruleRegister,
   ruleSectionLabel,
 } from "@/content/rules";
 import { openQuestions } from "@/content/openQuestions";
@@ -139,25 +140,168 @@ export function changesInWindow(rules: RuleRecord[], from: string, to: string): 
   return out.sort((a, b) => b.change.from.localeCompare(a.change.from) || a.rule.order - b.rule.order);
 }
 
-/* ---------- local date edits ---------- */
+/* ---------- local changes (edits to published rules, added rules) ---------- */
 
-/** Edited histories by rule id (kept in this browser; see components/chapters/rules/useRuleEdits.ts). */
-export type RuleEdits = Record<string, RuleStateChange[]>;
+/** The fields people can change, in form order, with their labels. */
+export const DETAIL_FIELDS: (keyof RuleDetails)[] = ["title", "text", "list", "plain", "section", "contexts", "strength", "owner", "entities", "questions"];
+export const FIELD_LABEL: Record<RuleField, string> = {
+  title: "Title",
+  text: "Rule statement",
+  list: "List items",
+  plain: "In plain words",
+  section: "Section",
+  contexts: "Context",
+  strength: "Strength",
+  owner: "Owner",
+  entities: "Entities",
+  questions: "Waits on",
+  history: "Dates",
+};
 
-/** The register with local edits applied: new history, re-derived active span, flagged as edited. */
-export function applyEdits(rules: RuleRecord[], edits: RuleEdits): RuleRecord[] {
-  if (!Object.keys(edits).length) return rules;
-  return rules.map((r) => {
-    const h = edits[r.id];
-    if (!h) return r;
+/** The editable details of a rule. */
+export const detailsOf = (r: RuleRecord | LocalRule): RuleDetails => ({
+  title: r.title,
+  text: r.text,
+  list: r.list,
+  plain: r.plain,
+  section: r.section,
+  contexts: r.contexts,
+  strength: r.strength,
+  owner: r.owner,
+  entities: r.entities,
+  questions: r.questions,
+});
+
+/** Empty lists and blank strings count as "not set". */
+const norm = (v: unknown) => (Array.isArray(v) ? (v.length ? JSON.stringify(v) : "") : typeof v === "string" ? v.trim() : v ?? "");
+export const sameValue = (a: unknown, b: unknown) => norm(a) === norm(b);
+const sameHistory = (a: RuleStateChange[], b: RuleStateChange[]) => a.length === b.length && a.every((h, i) => h.state === b[i].state && h.from === b[i].from);
+
+/** Only the fields of `next` that differ from the published rule (an empty patch = no local change). */
+export function diffPatch(published: RuleRecord, next: RulePatch): RulePatch {
+  const out: RulePatch = {};
+  for (const k of DETAIL_FIELDS) if (k in next && !sameValue(next[k], published[k])) (out as Record<string, unknown>)[k] = next[k];
+  if (next.history && !sameHistory(next.history, published.history)) out.history = next.history;
+  return out;
+}
+
+export const EMPTY_LOCAL: LocalChanges = { edits: {}, added: [], deleted: [], sections: { edits: {}, added: [], deleted: [] } };
+
+/** True when nothing is changed in this browser. */
+export const isEmptyLocal = (l: LocalChanges) =>
+  !Object.keys(l.edits).length && !l.added.length && !l.deleted.length && !Object.keys(l.sections.edits).length && !l.sections.added.length && !l.sections.deleted.length;
+
+/** Sections in use: published ones (minus deleted, with renames/moves) followed by sections added here. */
+export function applySections(published: RuleSection[], local: LocalChanges): RuleSection[] {
+  const { edits, added, deleted } = local.sections;
+  const out: RuleSection[] = published
+    .filter((s) => !deleted.includes(s.id))
+    .map((s) => {
+      const p = edits[s.id];
+      return p ? { ...s, ...p, edited: true, original: { label: s.label, part: s.part } } : s;
+    });
+  for (const a of added) out.push({ id: a.id, label: a.label, part: a.part, added: true });
+  return out;
+}
+
+/** Problems with a section's name and part (and id, for a new one). */
+export function validateSection(sec: { label: string; part: string }, opts: { id?: string; takenIds?: Set<string> } = {}): Partial<Record<"id" | "label" | "part", string>> {
+  const e: Partial<Record<"id" | "label" | "part", string>> = {};
+  if (opts.id !== undefined && (!/^[A-Za-z0-9][A-Za-z0-9.\-]{0,11}$/.test(opts.id) || opts.takenIds?.has(opts.id))) e.id = "Section id must be unique (letters, digits, dots, dashes).";
+  if (sec.label.trim().length < 3) e.label = "Name the section (at least 3 characters).";
+  else if (sec.label.length > 60) e.label = "Keep the name under 60 characters.";
+  if (sec.part.trim().length < 3) e.part = "Pick or name a part (at least 3 characters).";
+  else if (sec.part.length > 40) e.part = "Keep the part under 40 characters.";
+  return e;
+}
+
+/** A free id for a new section: S1, S2, … */
+export function suggestSectionId(sections: { id: string }[], local: LocalChanges): string {
+  const taken = new Set([...sections.map((x) => x.id), ...local.sections.added.map((x) => x.id), ...RULE_SECTIONS.map((x) => x.id)]);
+  let n = 1;
+  while (taken.has(`S${n}`)) n++;
+  return `S${n}`;
+}
+
+/** Spec parts in use, in first-seen order (the section form's part list and the coverage rows). */
+export const sectionParts = (sections: RuleSection[]) => [...new Set(sections.map((x) => x.part))];
+
+/**
+ * The register with this browser's changes applied: deleted rules (and rules in deleted sections) left out,
+ * patched published rules, then added rules at the end of their sections.
+ */
+export function applyLocal(rules: RuleRecord[], local: LocalChanges): RuleRecord[] {
+  if (isEmptyLocal(local)) return rules;
+  const live = new Set(applySections(RULE_SECTIONS, local).map((x) => x.id));
+  const deleted = new Set(local.deleted);
+  const out = rules.filter((r) => !deleted.has(r.id) && live.has(local.edits[r.id]?.section ?? r.section)).map((r) => {
+    const patch = local.edits[r.id];
+    if (!patch) return r;
+    const history = patch.history ?? r.history;
     // Set both span fields explicitly: an edit can make a rule never active (both undefined).
-    const span = activeSpan(h);
-    return { ...r, history: h, activeFrom: span.activeFrom, activeTo: span.activeTo, edited: true, originalHistory: r.history };
+    const span = activeSpan(history);
+    const changedFields = [...DETAIL_FIELDS.filter((k) => k in patch), ...(patch.history ? (["history"] as const) : [])] as RuleField[];
+    return { ...r, ...patch, history, activeFrom: span.activeFrom, activeTo: span.activeTo, edited: true, changedFields, original: r, originalHistory: r.history };
   });
+  // Added rules sit at the end of their section in document order.
+  local.added.forEach((a, i) => {
+    if (!live.has(a.section)) return;
+    const inSection = out.filter((r) => r.section === a.section);
+    const after = inSection.length ? Math.max(...inSection.map((r) => r.order)) : out.length;
+    const span = activeSpan(a.history);
+    out.push({
+      ...a,
+      order: after + 0.001 * (i + 1),
+      origin: "local",
+      sources: [],
+      confidence: "estimate",
+      activeFrom: span.activeFrom,
+      activeTo: span.activeTo,
+      added: true,
+    });
+  });
+  return out;
+}
+
+export type DetailErrors = Partial<Record<keyof RuleDetails | "id", string>>;
+
+/** Field-by-field problems with a rule's details (and its id, for a new rule). Empty object = fine. */
+export function validateRuleDetails(d: RuleDetails, opts: { id?: string; takenIds?: Set<string> } = {}): DetailErrors {
+  const e: DetailErrors = {};
+  if (opts.id !== undefined) {
+    if (!/^[A-Za-z][A-Za-z0-9.\-]{1,19}$/.test(opts.id)) e.id = "Use 2–20 letters, digits, dots or dashes, starting with a letter (e.g. R5.1.8).";
+    else if (opts.takenIds?.has(opts.id)) e.id = `${opts.id} is already used by another rule.`;
+  }
+  if (d.title.trim().length < 3) e.title = "Give the rule a short title (at least 3 characters).";
+  else if (d.title.length > 80) e.title = "Keep the title under 80 characters.";
+  if (d.text.trim().length < 10) e.text = "Write the rule statement (at least 10 characters).";
+  else if (d.text.length > 1200) e.text = "Keep the statement under 1,200 characters.";
+  if (d.plain && d.plain.length > 600) e.plain = "Keep the plain-words note under 600 characters.";
+  if (d.list && d.list.some((x) => x.length > 300)) e.list = "Keep each list item under 300 characters.";
+  if (!currentSections().some((x) => x.id === d.section)) e.section = "Pick a section.";
+  if (!d.contexts.length) e.contexts = "Pick at least one context.";
+  else if (d.contexts.length > 3) e.contexts = "Pick at most three contexts.";
+  else if (d.contexts.some((c) => !has(RULE_CONTEXTS, c))) e.contexts = "Unknown context.";
+  if (!has(RULE_STRENGTHS, d.strength)) e.strength = "Pick must, should or may.";
+  if (!(RULE_OWNERS as readonly string[]).includes(d.owner)) e.owner = "Pick an owner.";
+  if (d.entities && d.entities.some((x) => !/^[a-z0-9_.]+$/i.test(x))) e.entities = "Entities look like bom.bom_revision (letters, digits, dots, underscores).";
+  if (d.questions && d.questions.some((q) => !openQuestions.some((x) => x.id === q))) e.questions = "Unknown open question.";
+  return e;
+}
+
+/** A free id for a new rule in `section`: R5.1.8 after R5.1.7; WS.A9 in a session section; S1.1 in an added section. */
+export function suggestRuleId(section: string, rules: RuleRecord[]): string {
+  const taken = new Set(rules.map((r) => r.id));
+  // Spec sections: R5.1.8; session sections: WS.A9; sections added here (S1, …): S1.1.
+  const prefix = section.startsWith("WS-") ? `WS.${section.slice(3)}` : /^\d/.test(section) ? `R${section}.` : `${section}.`;
+  const nums = rules.filter((r) => r.id.startsWith(prefix)).map((r) => Number(r.id.slice(prefix.length))).filter((n) => Number.isFinite(n));
+  let n = (nums.length ? Math.max(...nums) : 0) + 1;
+  while (taken.has(`${prefix}${n}`)) n++;
+  return `${prefix}${n}`;
 }
 
 /** Why an edited history cannot be saved, or null when it is fine. */
-export function validateHistory(h: RuleStateChange[], r: RuleRecord): string | null {
+export function validateHistory(h: RuleStateChange[], r: Pick<RuleRecord, "supersededBy">): string | null {
   if (!h.length) return "Keep at least one state.";
   for (let i = 0; i < h.length; i++) {
     const { state, from } = h[i];
@@ -304,16 +448,17 @@ function facetValues(r: RuleRecord, facet: FacetKey, asOf: string): string[] {
 
 /* ---------- search ---------- */
 
-const haystack = new Map(
-  ruleRegister.map((r) => [
-    r.id,
-    [
+const haystackCache = new WeakMap<RuleRecord, string>();
+/** Lower-cased text a search runs over, cached per rule object (edited and added rules get their own). */
+function haystack(r: RuleRecord): string {
+  let h = haystackCache.get(r);
+  if (h === undefined) {
+    h = [
       r.id,
       r.title,
       r.text,
       ...(r.list ?? []),
       r.plain ?? "",
-      ruleSectionLabel(r.section),
       ...r.contexts.map((c) => RULE_CONTEXTS[c].label),
       r.owner,
       RULE_STRENGTHS[r.strength].label,
@@ -323,9 +468,11 @@ const haystack = new Map(
       r.supersededBy ?? "",
     ]
       .join(" ")
-      .toLowerCase(),
-  ])
-);
+      .toLowerCase();
+    haystackCache.set(r, h);
+  }
+  return h;
+}
 
 export const searchTokens = (q: string) => q.toLowerCase().split(/\s+/).filter(Boolean);
 
@@ -343,13 +490,13 @@ export function filterRules(rules: RuleRecord[], q: RuleQuery, asOf: string, exc
     if (q.flag && except !== "flag" && !needsConfirmation(r)) return false;
     if (q.question && !(r.questions ?? []).includes(q.question)) return false;
     if (q.vs && q.changed && !changeBetween(r, q.vs, asOf)) return false;
-    if (q.edited && !r.edited) return false;
+    if (q.edited && !r.edited && !r.added) return false;
     for (const f of facets) {
       const want = q[f] as string[];
       if (!facetValues(r, f, asOf).some((v) => want.includes(v))) return false;
     }
     if (tokens.length) {
-      const h = haystack.get(r.id) ?? "";
+      const h = `${haystack(r)} ${ruleSectionLabel(r.section).toLowerCase()}`;
       if (!tokens.every((t) => h.includes(t))) return false;
     }
     return true;
@@ -380,11 +527,16 @@ export const FACET_OPTIONS: Record<FacetKey, FacetOption[]> = {
   ],
   state: [...RULE_STATE_ORDER, "none" as const].map((s) => ({ value: s, label: STATE_LABEL[s] })),
   ctx: RULE_CONTEXT_ORDER.map((c) => ({ value: c, label: RULE_CONTEXTS[c].label })),
-  sec: RULE_SECTIONS.map((s) => ({ value: s.id, label: ruleSectionLabel(s.id), group: s.part })),
+  // Published sections; facetOptions("sec") gives the sections in use (incl. added / renamed ones).
+  sec: RULE_SECTIONS.map((x) => ({ value: x.id, label: ruleSectionLabel(x.id), group: x.part })),
   str: (Object.keys(RULE_STRENGTHS) as RuleStrength[]).map((s) => ({ value: s, label: RULE_STRENGTHS[s].label })),
   origin: (Object.keys(RULE_ORIGINS) as RuleOrigin[]).map((o) => ({ value: o, label: RULE_ORIGINS[o].label })),
   owner: RULE_OWNERS.map((o) => ({ value: o, label: o })),
 };
+
+/** Options for a facet as things stand (sections follow this browser's changes). */
+export const facetOptions = (facet: FacetKey): FacetOption[] =>
+  facet === "sec" ? currentSections().map((x) => ({ value: x.id, label: ruleSectionLabel(x.id), group: x.part })) : FACET_OPTIONS[facet];
 
 export const SORT_LABEL: Record<RuleSortKey, string> = {
   id: "ID",
@@ -437,10 +589,10 @@ const VIEWS: RuleView[] = ["table", "cards", "timeline"];
 
 export function parseRuleQuery(params: URLSearchParams): RuleQuery {
   const list = (facet: FacetKey) => {
-    const ok = new Set(FACET_OPTIONS[facet].map((o) => o.value));
+    const ok = facet === "sec" ? null : new Set(FACET_OPTIONS[facet].map((o) => o.value));
     // Accept both ?ctx=a,b and ?ctx=a&ctx=b.
     const values = params.getAll(LIST_PARAMS[facet]).flatMap((v) => v.split(",")).map((v) => v.trim());
-    return values.filter((v, i) => v && ok.has(v) && values.indexOf(v) === i);
+    return values.filter((v, i) => v && (ok ? ok.has(v) : /^[A-Za-z0-9.\-]{1,20}$/.test(v)) && values.indexOf(v) === i);
   };
   const sort = params.get("sort");
   const asOf = params.get("asOf");
@@ -537,7 +689,7 @@ const csvCell = (v: string) => {
 
 /** CSV of the rules as shown (filtered and sorted), with the as-of status. */
 export function rulesToCsv(rules: RuleRecord[], asOf: string): string {
-  const head = ["ID", "Title", "Rule", "Status", `State on ${asOf}`, "Active from", "Active to", "Contexts", "Section", "Strength", "Owner", "Source", "Waits on", "Superseded by", "Entities", "State history", "Dates edited", "Source ids", "Metadata"];
+  const head = ["ID", "Title", "Rule", "Status", `State on ${asOf}`, "Active from", "Active to", "Contexts", "Section", "Strength", "Owner", "Source", "Waits on", "Superseded by", "Entities", "State history", "Local change", "Changed fields", "Source ids", "Metadata"];
   const rows = rules.map((r) => [
     r.id,
     r.title,
@@ -555,9 +707,10 @@ export function rulesToCsv(rules: RuleRecord[], asOf: string): string {
     r.supersededBy ?? "",
     (r.entities ?? []).join("; "),
     historyText(r),
-    r.edited ? "Yes (in this browser)" : "",
+    r.added ? "Added in this browser" : r.edited ? "Edited in this browser" : "",
+    (r.changedFields ?? []).map((f) => FIELD_LABEL[f]).join("; "),
     r.sources.join("; "),
-    "Sample state history, contexts and owner",
+    r.added ? "Added in this browser; not part of the published register" : "Sample state history, contexts and owner",
   ]);
   return "﻿" + [head, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
 }

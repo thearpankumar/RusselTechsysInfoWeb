@@ -1,14 +1,15 @@
 "use client";
 
 // Register toolbar, two compact rows (fits a 14" laptop without pushing the table down):
-//   1. search · result count · dates (as-of + compare, one popover) · sort · view switch · download
-//   2. filters: facet pills (each shows and clears its own values), flags, "Clear all"
+//   1. search · dates (as-of + compare, one popover) · sort · view switch · download · Add rule · ⋯ (sections,
+//      deleted items, discard local changes)
+//   2. filters: facet pills (each shows and clears its own values), flags, "Clear all", result count
 // Patterns: Carbon data-table toolbar (few actions, row-height controls), Genesys Spark table filtering (compact
 // search, filters as a row of dropdowns), PatternFly toolbar (search, filter, sort and view grouped above the data).
 import * as React from "react";
 import { Popover as PopoverPrimitive } from "radix-ui";
-import { ArrowDown, ArrowUp, CalendarDays, ChartGantt, Check, ChevronDown, Download, FileSpreadsheet, FileText, LayoutGrid, Pencil, Plus, RotateCcw, Rows3, Search, X } from "lucide-react";
-import type { RuleContext, RuleRecord } from "@/content/types-extra";
+import { ArrowDown, ArrowUp, CalendarDays, ChartGantt, Check, ChevronDown, Download, Ellipsis, FileSpreadsheet, FileText, FolderPlus, LayoutGrid, ListTree, Pencil, Plus, RotateCcw, Rows3, Search, Trash2, X } from "lucide-react";
+import type { LocalChanges, RuleContext, RuleRecord } from "@/content/types-extra";
 import { RULE_CONTEXTS } from "@/content/rules";
 import { Button, Kbd, Marker, TabTrack } from "@/components/ui-rt";
 import { useJourney } from "@/components/journey/JourneyProvider";
@@ -16,7 +17,7 @@ import { dataBg } from "@/lib/dataColors";
 import {
   FACETS,
   FACET_LABEL,
-  FACET_OPTIONS,
+  facetOptions,
   SORT_LABEL,
   addDays,
   facetCounts,
@@ -36,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { FacetPill, MoreFacets, type FacetPillOption } from "./FacetPill";
 import { DateField, StateMarker } from "./shared";
 import type { RulesState } from "./useRulesState";
+import type { SectionsPanelView } from "./SectionsPanel";
 
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
@@ -64,8 +66,13 @@ export function RulesToolbar({
   today,
   list,
   searchRef,
-  editCount,
-  onDiscardEdits,
+  local,
+  changedCount,
+  localCount,
+  deletedCount,
+  onAddRule,
+  onManage,
+  onDiscardAll,
 }: {
   state: RulesState;
   /** The register with this browser's date edits applied. */
@@ -77,9 +84,17 @@ export function RulesToolbar({
   today: string;
   list: RuleRecord[];
   searchRef: React.RefObject<HTMLInputElement | null>;
-  /** Rules whose dates were edited in this browser. */
-  editCount: number;
-  onDiscardEdits: () => void;
+  /** Everything changed in this browser (exported to Excel). */
+  local: LocalChanges;
+  /** Rules edited or added in this browser (the "Local changes" filter). */
+  changedCount: number;
+  /** Every local change (incl. deleted rules and section changes). */
+  localCount: number;
+  /** Published rules and sections deleted here. */
+  deletedCount: number;
+  onAddRule: () => void;
+  onManage: (view: SectionsPanelView) => void;
+  onDiscardAll: () => void;
 }) {
   const { query, setQuery, clearFilters, view, setView } = state;
   const { active } = useJourney();
@@ -105,7 +120,7 @@ export function RulesToolbar({
     const out = {} as Record<FacetKey, FacetPillOption[]>;
     for (const f of FACETS) {
       const counts = facetCounts(rules, counted, asOf, f);
-      out[f] = FACET_OPTIONS[f].map((o) => ({ ...o, count: counts.get(o.value) ?? 0, marker: facetMarker(f, o.value) }));
+      out[f] = facetOptions(f).map((o) => ({ ...o, count: counts.get(o.value) ?? 0, marker: facetMarker(f, o.value) }));
     }
     return out;
   }, [rules, counted, asOf]);
@@ -155,9 +170,6 @@ export function RulesToolbar({
             <Kbd className="hidden h-6 min-w-6 sm:inline-flex">f</Kbd>
           )}
         </label>
-        <p role="status" aria-live="polite" className="px-2 t-body-md whitespace-nowrap text-body">
-          <span className="tnum text-on-surface">{list.length}</span> of <span className="tnum">{rules.length}</span> rules
-        </p>
         <DatesMenu query={query} setQuery={setQuery} today={today} liveAsOf={liveAsOf} asOfInput={asOfInput} vsInput={vsInput} compareButton={compareButton} />
         <SortMenu sort={query.sort} dir={query.dir} onChange={(sort, dir) => setQuery({ sort, dir })} />
         <TabTrack<RuleView>
@@ -172,7 +184,11 @@ export function RulesToolbar({
             { value: "timeline", label: <span className={WIDE}>Timeline</span>, icon: <ChartGantt aria-hidden /> },
           ]}
         />
-        <DownloadMenu rules={rules} query={query} asOf={asOf} list={list} editCount={editCount} />
+        <DownloadMenu rules={rules} local={local} query={query} asOf={asOf} list={list} editCount={localCount} />
+        <Button size="sm" icon={<Plus aria-hidden />} onClick={onAddRule}>
+          Add rule
+        </Button>
+        <ActionsMenu localCount={localCount} deletedCount={deletedCount} onManage={onManage} onDiscardAll={onDiscardAll} />
       </div>
 
       {/* Row 2: filters */}
@@ -207,16 +223,17 @@ export function RulesToolbar({
           Needs confirmation
           <span className="tnum text-muted">{flags}</span>
         </button>
-        {(editCount > 0 || query.edited) && (
+        {(changedCount > 0 || query.edited) && (
           <button
             type="button"
             aria-pressed={query.edited}
             onClick={() => setQuery({ edited: !query.edited })}
+            title="Rules edited or added in this browser"
             className={cn(pill, "cursor-pointer hover:border-chart-past hover:bg-surface-raised", query.edited ? "border-chart-past bg-surface-raised text-on-surface" : "border-dashed border-border text-body")}
           >
             <Pencil aria-hidden className="size-4 text-muted" strokeWidth={1.5} />
-            Edited dates
-            <span className="tnum text-muted">{editCount}</span>
+            Local changes
+            <span className="tnum text-muted">{changedCount}</span>
           </button>
         )}
         {query.question && (
@@ -245,25 +262,14 @@ export function RulesToolbar({
             Changed since {formatDate(query.vs)} only
           </button>
         )}
-        {editCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (window.confirm(`Discard the date edits on ${editCount} ${editCount === 1 ? "rule" : "rules"}? This cannot be undone.`)) {
-                onDiscardEdits();
-                searchRef.current?.focus();
-              }
-            }}
-          >
-            Discard {editCount} {editCount === 1 ? "edit" : "edits"}
-          </Button>
-        )}
         {filtered && (
           <Button variant="ghost" size="sm" onClick={clearAll}>
             Clear all
           </Button>
         )}
+        <p role="status" aria-live="polite" className="ml-auto px-2 t-body-md whitespace-nowrap text-body">
+          <span className="tnum text-on-surface">{list.length}</span> of <span className="tnum">{rules.length}</span> rules
+        </p>
       </div>
     </div>
   );
@@ -395,6 +401,80 @@ function DatesMenu({
   );
 }
 
+/** ⋯ menu: section management, deleted items, discard every local change. */
+function ActionsMenu({
+  localCount,
+  deletedCount,
+  onManage,
+  onDiscardAll,
+}: {
+  localCount: number;
+  deletedCount: number;
+  onManage: (view: SectionsPanelView) => void;
+  onDiscardAll: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const item = "flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left t-body-md transition-colors duration-150 hover:bg-surface-raised disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted";
+  const go = (v: SectionsPanelView) => {
+    setOpen(false);
+    onManage(v);
+  };
+  return (
+    <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
+      <PopoverPrimitive.Trigger asChild>
+        <button
+          type="button"
+          aria-label={`More actions${localCount ? `, ${localCount} local changes` : ""}`}
+          title="Sections, deleted items, local changes"
+          className={cn(pill, "relative w-10 cursor-pointer justify-center border-border px-0 text-on-surface hover:border-chart-past hover:bg-surface-raised data-[state=open]:border-chart-past data-[state=open]:bg-surface-raised")}
+        >
+          <Ellipsis aria-hidden className="size-4" strokeWidth={1.5} />
+          {localCount > 0 && <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background bg-primary" />}
+        </button>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="end"
+          sideOffset={8}
+          collisionPadding={16}
+          onKeyDown={(e) => e.stopPropagation()}
+          aria-label="More actions"
+          className="z-50 w-72 rounded-lg border border-border bg-background p-2 text-on-surface duration-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
+        >
+          <button type="button" className={item} onClick={() => go("add")}>
+            <FolderPlus strokeWidth={1.5} />
+            Add section
+          </button>
+          <button type="button" className={item} onClick={() => go("sections")}>
+            <ListTree strokeWidth={1.5} />
+            Manage sections
+          </button>
+          <button type="button" className={item} onClick={() => go("deleted")}>
+            <RotateCcw strokeWidth={1.5} />
+            <span className="flex-1">Deleted here</span>
+            <span className="t-mono-sm text-muted tnum">{deletedCount}</span>
+          </button>
+          <div className="my-1 border-t border-border" />
+          <button
+            type="button"
+            className={item}
+            disabled={!localCount}
+            onClick={() => {
+              setOpen(false);
+              if (window.confirm(`Discard all ${localCount} local changes (edits, added and deleted rules and sections)? This cannot be undone.`)) onDiscardAll();
+            }}
+          >
+            <Trash2 strokeWidth={1.5} />
+            <span className="flex-1">Discard all local changes</span>
+            <span className="t-mono-sm text-muted tnum">{localCount}</span>
+          </button>
+          <p className="px-2 pt-2 pb-1 t-body-sm text-muted">Changes stay in this browser. Download Excel to share them.</p>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
+  );
+}
+
 const SORT_KEYS = Object.keys(SORT_LABEL) as RuleSortKey[];
 
 function SortMenu({ sort, dir, onChange }: { sort: RuleSortKey; dir: "asc" | "desc"; onChange: (sort: RuleSortKey, dir: "asc" | "desc") => void }) {
@@ -462,7 +542,7 @@ function SortMenu({ sort, dir, onChange }: { sort: RuleSortKey; dir: "asc" | "de
 
 const loadExcel = () => import("@/lib/rulesExcel");
 
-function DownloadMenu({ rules, query, asOf, list, editCount }: { rules: RuleRecord[]; query: RuleQuery; asOf: string; list: RuleRecord[]; editCount: number }) {
+function DownloadMenu({ rules, local, query, asOf, list, editCount }: { rules: RuleRecord[]; local: LocalChanges; query: RuleQuery; asOf: string; list: RuleRecord[]; editCount: number }) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -471,7 +551,7 @@ function DownloadMenu({ rules, query, asOf, list, editCount }: { rules: RuleReco
     setError(null);
     try {
       const { downloadRulesWorkbook } = await loadExcel();
-      saveBlob(await downloadRulesWorkbook({ rules, asOf, query, shown: list }), `rossell-business-rules-${asOf}.xlsx`);
+      saveBlob(await downloadRulesWorkbook({ rules, local, asOf, query, shown: list }), `rossell-business-rules-${asOf}.xlsx`);
     } catch {
       setError("The workbook could not be built. Try the CSV instead.");
     } finally {
@@ -510,8 +590,8 @@ function DownloadMenu({ rules, query, asOf, list, editCount }: { rules: RuleReco
             <span className="flex flex-col">
               <span className="t-body-md text-on-surface">{busy ? "Preparing workbook…" : "Excel workbook (.xlsx)"}</span>
               <span className="t-body-sm text-muted">
-                All {rules.length} rules with state history, open questions and contexts; status as of {formatDate(asOf)}.
-                {editCount > 0 && ` Your ${editCount} edited ${editCount === 1 ? "rule is" : "rules are"} highlighted yellow.`}
+                All {rules.length} rules with state history, sections, open questions and contexts; status as of {formatDate(asOf)}.
+                {editCount > 0 && ` Your ${editCount} local ${editCount === 1 ? "change is" : "changes are"} highlighted, with a sheet listing every change.`}
               </span>
             </span>
           </button>

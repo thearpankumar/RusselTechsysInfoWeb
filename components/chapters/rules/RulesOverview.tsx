@@ -3,7 +3,7 @@
 // At a glance: four counts that double as preset filters, the context mix (each context a filter), and the
 // note on what is sample data.
 import * as React from "react";
-import { RULE_CONTEXTS, RULE_CONTEXT_ORDER, ruleRegister } from "@/content/rules";
+import { RULE_CONTEXTS, RULE_CONTEXT_ORDER } from "@/content/rules";
 import type { RuleContext, RuleRecord } from "@/content/types-extra";
 import { Cite, ConfidenceTag, Stat, StatRow } from "@/components/ui-rt";
 import { dataBg } from "@/lib/dataColors";
@@ -11,9 +11,6 @@ import { DEFAULT_QUERY, formatDate, isActive, needsConfirmation, type RuleQuery 
 import { cn } from "@/lib/utils";
 import { SampleTag } from "./shared";
 
-const contextCounts = Object.fromEntries(RULE_CONTEXT_ORDER.map((c) => [c, ruleRegister.filter((r) => r.contexts.includes(c)).length])) as Record<RuleContext, number>;
-const maxContext = Math.max(...Object.values(contextCounts));
-const flagged = ruleRegister.filter(needsConfirmation).length;
 
 const FILTER_KEYS = ["q", "status", "state", "ctx", "sec", "str", "origin", "owner", "flag", "question", "changed", "edited"] as const;
 
@@ -38,14 +35,17 @@ export function RulesOverview({
   onToggleContext: (c: RuleContext) => void;
 }) {
   const active = rules.filter((r) => isActive(r, asOf)).length;
+  const contextCounts = Object.fromEntries(RULE_CONTEXT_ORDER.map((c) => [c, rules.filter((r) => r.contexts.includes(c)).length])) as Record<RuleContext, number>;
+  const maxContext = Math.max(1, ...Object.values(contextCounts));
+  const flagged = rules.filter(needsConfirmation).length;
   const when = formatDate(asOf);
 
   return (
     <div className="flex flex-col gap-12">
       <StatRow>
-        <Stat label="In the register" value={ruleRegister.length} unit="rules" caption="Spec and working sessions" sub="Every rule recorded so far" selected={isPreset(query, {})} onClick={() => onPreset({})} />
+        <Stat label="In the register" value={rules.length} unit="rules" caption="Spec and working sessions" sub="Every rule recorded so far" selected={isPreset(query, {})} onClick={() => onPreset({})} />
         <Stat label="Active" value={active} unit="rules" caption={`In force on ${when}`} sub="Approved and in force" selected={isPreset(query, { status: ["active"] })} onClick={() => onPreset({ status: ["active"] })} />
-        <Stat label="Inactive" value={ruleRegister.length - active} unit="rules" caption="In draft, review or replaced" sub="Kept with their full state history" selected={isPreset(query, { status: ["inactive"] })} onClick={() => onPreset({ status: ["inactive"] })} />
+        <Stat label="Inactive" value={rules.length - active} unit="rules" caption="In draft, review or replaced" sub="Kept with their full state history" selected={isPreset(query, { status: ["inactive"] })} onClick={() => onPreset({ status: ["inactive"] })} />
         <Stat label="Needs confirmation" value={flagged} unit="rules" caption="Wait on an open question" sub="Confirm with Rossell's teams" selected={isPreset(query, { flag: true })} onClick={() => onPreset({ flag: true })} />
       </StatRow>
 

@@ -3,8 +3,8 @@
 // Coverage matrix: spec parts × contexts. Each cell counts the rules in that part that apply to that context, on
 // the grey-to-highlight heat ramp (DESIGN.md); empty cells show "—". A cell filters the register to those rules.
 import * as React from "react";
-import { RULE_CONTEXTS, RULE_CONTEXT_ORDER, RULE_SECTIONS, ruleRegister } from "@/content/rules";
-import type { RuleContext } from "@/content/types-extra";
+import { RULE_CONTEXTS, RULE_CONTEXT_ORDER, currentSections } from "@/content/rules";
+import type { RuleContext, RuleRecord } from "@/content/types-extra";
 import { heatLevel, type HeatLevel } from "@/components/ui-rt";
 import { dataBg } from "@/lib/dataColors";
 import type { RuleQuery } from "@/lib/rules";
@@ -19,25 +19,21 @@ const LEVEL: Record<HeatLevel, string> = {
   high: "bg-primary text-on-primary",
 };
 
-const parts = [...new Set(RULE_SECTIONS.map((s) => s.part))].map((part) => ({
-  part,
-  sections: RULE_SECTIONS.filter((s) => s.part === part).map((s) => s.id),
-}));
-
-const matrix = parts.map(({ part, sections }) => {
-  const inPart = ruleRegister.filter((r) => sections.includes(r.section));
-  return {
-    part,
-    sections,
-    total: inPart.length,
-    cells: RULE_CONTEXT_ORDER.map((c) => inPart.filter((r) => r.contexts.includes(c)).length),
-  };
-});
-const max = Math.max(...matrix.flatMap((m) => m.cells));
+/** Parts × contexts from the sections and rules in use (this browser's changes included). */
+function buildMatrix(rules: RuleRecord[]) {
+  const sections = currentSections();
+  const parts = [...new Set(sections.map((s) => s.part))].map((part) => ({ part, sections: sections.filter((s) => s.part === part).map((s) => s.id) }));
+  const matrix = parts.map(({ part, sections: ids }) => {
+    const inPart = rules.filter((r) => ids.includes(r.section));
+    return { part, sections: ids, total: inPart.length, cells: RULE_CONTEXT_ORDER.map((c) => inPart.filter((r) => r.contexts.includes(c)).length) };
+  });
+  return { matrix, max: Math.max(1, ...matrix.flatMap((m) => m.cells)) };
+}
 
 const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
-export function RulesCoverage({ query, onSelect }: { query: RuleQuery; onSelect: (ctx: RuleContext, sections: string[]) => void }) {
+export function RulesCoverage({ rules, query, onSelect }: { rules: RuleRecord[]; query: RuleQuery; onSelect: (ctx: RuleContext, sections: string[]) => void }) {
+  const { matrix, max } = React.useMemo(() => buildMatrix(rules), [rules]);
   const scroller = React.useRef<HTMLDivElement>(null);
   const scrolls = useOverflowX(scroller);
   return (

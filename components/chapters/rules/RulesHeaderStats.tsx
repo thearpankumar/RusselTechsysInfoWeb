@@ -9,12 +9,12 @@ import { cn } from "@/lib/utils";
 
 export function RulesHeaderStats({ rules, asOf, onPreset }: { rules: RuleRecord[]; asOf: string; onPreset: (patch: Partial<RuleQuery>) => void }) {
   const active = rules.filter((r) => isActive(r, asOf)).length;
-  const edited = rules.filter((r) => r.edited).length;
+  const changed = rules.filter((r) => r.edited || r.added).length;
   const cells: { label: string; value: number; patch: Partial<RuleQuery> }[] = [
     { label: "Active", value: active, patch: { status: ["active"] } },
     { label: "Inactive", value: rules.length - active, patch: { status: ["inactive"] } },
     { label: "Need confirmation", value: rules.filter(needsConfirmation).length, patch: { flag: true } },
-    edited ? { label: "Dates edited", value: edited, patch: { edited: true } } : { label: "In the register", value: rules.length, patch: {} },
+    changed ? { label: "Changed here", value: changed, patch: { edited: true } } : { label: "In the register", value: rules.length, patch: {} },
   ];
   return (
     <div className="w-full lg:w-88">

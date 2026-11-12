@@ -2,8 +2,8 @@
 
 // Open questions that gate rules: each lists the rules waiting on it and filters the register to them.
 import * as React from "react";
-import type { OpenQuestion } from "@/content/types-extra";
-import { ruleQuestions } from "@/content/rules";
+import type { OpenQuestion, RuleRecord } from "@/content/types-extra";
+import { openQuestions } from "@/content/openQuestions";
 import { Button, Cite, Marker } from "@/components/ui-rt";
 
 // Open = hatched (waiting, the same mark as "Needs confirmation"); partly answered = grey dot; answered = highlighted dot.
@@ -13,7 +13,9 @@ const STATUS: Record<OpenQuestion["status"], { label: string; shape: "dot" | "ha
   answered: { label: "Answered", shape: "dot", tone: "primary" },
 };
 
-export function RuleQuestions({ onFilter, onOpenRule }: { onFilter: (questionId: string) => void; onOpenRule: (id: string) => void }) {
+export function RuleQuestions({ rules, onFilter, onOpenRule }: { rules: RuleRecord[]; onFilter: (questionId: string) => void; onOpenRule: (id: string) => void }) {
+  // Questions that gate at least one rule in use (local changes included).
+  const ruleQuestions = openQuestions.map((q) => ({ question: q, rules: rules.filter((r) => r.questions?.includes(q.id)) })).filter((x) => x.rules.length > 0);
   return (
     <ol className="border-t border-border">
       {ruleQuestions.map(({ question: q, rules }) => {

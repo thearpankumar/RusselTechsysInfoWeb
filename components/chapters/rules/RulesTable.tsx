@@ -6,10 +6,10 @@
 import * as React from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { RuleRecord } from "@/content/types-extra";
-import { RULE_STRENGTHS, ruleSectionLabel } from "@/content/rules";
+import { RULE_STRENGTHS, ruleSectionLabel, sectionShort } from "@/content/rules";
 import { SORT_LABEL, matchedEntities, type RuleSortKey, type SortDir } from "@/lib/rules";
 import { cn } from "@/lib/utils";
-import { ChangeTag, ConfirmFlag, ContextTag, EditedTag, Highlight, StatusLabel, keepArrows, useOverflowX } from "./shared";
+import { AddedTag, ChangeTag, ConfirmFlag, ContextTag, EditedTag, Highlight, StatusLabel, keepArrows, useOverflowX } from "./shared";
 
 /** Each column sorts by one or more keys (status shares a column with the active period it is derived from). */
 const COLUMNS: { id: string; sorts: { key: RuleSortKey; label: string }[]; className: string }[] = [
@@ -137,7 +137,8 @@ export const RulesTable = React.memo(function RulesTable({
                     <span className="block t-mono-sm text-on-surface">
                       <Highlight text={r.id} tokens={tokens} />
                     </span>
-                    <span className="mt-1 block t-mono-sm text-muted">{r.section.startsWith("WS") ? "Session" : `§${r.section}`}</span>
+                    <span className="mt-1 block truncate t-mono-sm text-muted">{sectionShort(r.section)}</span>
+                    {r.added && <AddedTag className="mt-2" />}
                     {r.edited && <EditedTag className="mt-2" />}
                   </td>
                   <td className={cell}>

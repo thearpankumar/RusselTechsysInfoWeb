@@ -328,8 +328,8 @@ export type RuleContext =
 /** Must / should / may, from the rule's wording. */
 export type RuleStrength = "must" | "should" | "may";
 
-/** Where the rule was agreed: the business-rules spec or the working sessions. */
-export type RuleOrigin = "spec" | "session";
+/** Where the rule came from: the business-rules spec, the working sessions, or added in this browser. */
+export type RuleOrigin = "spec" | "session" | "local";
 
 /** Lifecycle state of a rule. Only "active" counts as Active; every other state is Inactive. */
 export type RuleLifecycle = "draft" | "review" | "approved" | "active" | "suspended" | "retired" | "superseded";
@@ -374,10 +374,68 @@ export interface RuleRecord extends Sourced {
   entities?: string[];
   /** OpenQuestion ids this rule waits on ("Needs confirmation"). */
   questions?: string[];
-  /** Runtime only: the dates were edited in this browser (components/chapters/rules/useRuleEdits.ts). */
+  /** Runtime only: changed in this browser (components/chapters/rules/useLocalRules.ts). */
   edited?: boolean;
+  /** Runtime only: added in this browser (not part of the published register). */
+  added?: boolean;
+  /** Runtime only: which fields differ from the published rule ("title", "contexts", "history", …). */
+  changedFields?: RuleField[];
+  /** Runtime only: the published rule, when edited. */
+  original?: RuleRecord;
   /** Runtime only: the history as published, when edited. */
   originalHistory?: RuleStateChange[];
+}
+
+/** The fields a person can change on a rule in this browser. */
+export interface RuleDetails {
+  title: string;
+  text: string;
+  list?: string[];
+  plain?: string;
+  section: string;
+  contexts: RuleContext[];
+  strength: RuleStrength;
+  owner: string;
+  entities?: string[];
+  questions?: string[];
+}
+export type RuleField = keyof RuleDetails | "history";
+
+/** Local changes to a published rule: only the fields that differ. */
+export type RulePatch = Partial<RuleDetails> & { history?: RuleStateChange[] };
+
+/** A rule added in this browser. */
+export interface LocalRule extends RuleDetails {
+  id: string;
+  history: RuleStateChange[];
+  /** ISO date it was added. */
+  createdAt: string;
+}
+
+/** A section added in this browser. */
+export interface LocalSection {
+  id: string;
+  label: string;
+  part: string;
+  createdAt: string;
+}
+/** Local changes to a published section. */
+export type SectionPatch = Partial<Pick<LocalSection, "label" | "part">>;
+
+/** Everything changed in this browser. Deleting a published rule or section only hides it here (restorable). */
+export interface LocalChanges {
+  /** Patches to published rules (only the fields that differ). */
+  edits: Record<string, RulePatch>;
+  /** Rules added here. */
+  added: LocalRule[];
+  /** Published rules deleted (hidden) here. */
+  deleted: string[];
+  sections: {
+    edits: Record<string, SectionPatch>;
+    added: LocalSection[];
+    /** Published sections deleted (hidden, with their rules) here. */
+    deleted: string[];
+  };
 }
 
 export interface SystemFact extends Sourced {

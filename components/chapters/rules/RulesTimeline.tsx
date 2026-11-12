@@ -149,7 +149,7 @@ export const RulesTimeline = React.memo(function RulesTimeline({
                           data-rule-open={r.id}
                           aria-current={current || undefined}
                           onClick={() => onOpen(r.id)}
-                          aria-label={`${r.id} ${r.title}${r.edited ? " (dates edited)" : ""}. ${active ? "Active" : `Inactive, ${STATE_LABEL[state]}`}: ${statusLine(r, asOf)}. History: ${summary}.`}
+                          aria-label={`${r.id} ${r.title}${r.added ? " (added here)" : r.edited ? " (changed here)" : ""}. ${active ? "Active" : `Inactive, ${STATE_LABEL[state]}`}: ${statusLine(r, asOf)}. History: ${summary}.`}
                           className={cn(
                             "group grid w-full cursor-pointer items-center border-b border-border text-left transition-colors duration-150 hover:bg-surface-raised",
                             LABEL_COL,
@@ -169,7 +169,7 @@ export const RulesTimeline = React.memo(function RulesTimeline({
                             <span className={cn("hidden truncate t-body-sm md:block", active ? "text-on-surface" : "text-body")}>
                               <Highlight text={r.title} tokens={tokens} />
                             </span>
-                            {r.edited && <Pencil aria-hidden className="ml-auto size-3.5 shrink-0 text-muted" strokeWidth={1.5} />}
+                            {(r.edited || r.added) && <Pencil aria-hidden className="ml-auto size-3.5 shrink-0 text-muted" strokeWidth={1.5} />}
                           </span>
                           <span aria-hidden className="relative mr-6 block h-10" title={summary}>
                             {band && <span className="absolute inset-y-0 bg-primary/5" style={{ left: `${band.left}%`, width: `${band.width}%` }} />}

@@ -4,13 +4,13 @@
 // list, so 120 rules stay scannable on a phone instead of a 35,000px stack of cards.
 import * as React from "react";
 import type { RuleRecord } from "@/content/types-extra";
-import { RULE_CONTEXTS, RULE_STRENGTHS } from "@/content/rules";
+import { RULE_CONTEXTS, RULE_STRENGTHS, sectionShort } from "@/content/rules";
 import { dataBg } from "@/lib/dataColors";
 import { STATE_LABEL, formatShort, isActive, matchedEntities, ruleStateAt, stateAt } from "@/lib/rules";
 import { cn } from "@/lib/utils";
-import { ChangeTag, ConfirmFlag, ContextTag, EditedTag, Highlight, StateMarker, StatusLabel } from "./shared";
+import { AddedTag, ChangeTag, ConfirmFlag, ContextTag, EditedTag, Highlight, StateMarker, StatusLabel } from "./shared";
 
-const sectionTag = (r: RuleRecord) => (r.section.startsWith("WS") ? "Session" : `§${r.section}`);
+const sectionTag = (r: RuleRecord) => sectionShort(r.section);
 
 export const RulesCards = React.memo(function RulesCards({
   rules,
@@ -52,7 +52,7 @@ export const RulesCards = React.memo(function RulesCards({
                 <StateMarker state={ruleStateAt(r, asOf)} />
                 <span className="min-w-0 flex-1 truncate t-body-sm text-muted">
                   {isActive(r, asOf) ? `Active since ${formatShort(stateAt(r, asOf)!.from)}` : `Inactive · ${STATE_LABEL[ruleStateAt(r, asOf)]}`}
-                  {r.edited && " · Edited"}
+                  {r.added ? " · Added" : r.edited ? " · Edited" : ""}
                 </span>
                 <span className="flex shrink-0 gap-1" aria-label={r.contexts.map((c) => RULE_CONTEXTS[c].label).join(", ")}>
                   {r.contexts.map((c) => (
@@ -90,6 +90,7 @@ export const RulesCards = React.memo(function RulesCards({
                     </span>
                     {" · "}
                     {sectionTag(r)}
+                    {r.added && <AddedTag className="ml-2 align-middle" />}
                     {r.edited && <EditedTag className="ml-2 align-middle" />}
                   </span>
                   <span>

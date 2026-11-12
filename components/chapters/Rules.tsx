@@ -13,7 +13,7 @@ import { ruleRegister } from "@/content/rules";
 import { useReducedMotionSafe } from "@/hooks/useReducedMotionSafe";
 import { useSearchOpen } from "@/lib/searchIndex";
 import { sectionHref } from "@/lib/structure";
-import { DEFAULT_QUERY, FACETS, FACET_LABEL, applyEdits, facetValueLabel, filterRules, formatDate, searchTokens, sortRules, timelineDomain, writeRuleParams, type RuleQuery, type RuleSortKey } from "@/lib/rules";
+import { DEFAULT_QUERY, FACETS, FACET_LABEL, applyLocal, facetValueLabel, filterRules, formatDate, searchTokens, sortRules, timelineDomain, writeRuleParams, type RuleQuery, type RuleSortKey } from "@/lib/rules";
 import { RulePanel } from "./rules/RulePanel";
 import { RuleQuestions } from "./rules/RuleQuestions";
 import { RulesCards } from "./rules/RulesCards";
@@ -25,7 +25,8 @@ import { RulesTable } from "./rules/RulesTable";
 import { RulesTimeline } from "./rules/RulesTimeline";
 import { RulesToolbar } from "./rules/RulesToolbar";
 import { useToday } from "./rules/shared";
-import { useRuleEdits } from "./rules/useRuleEdits";
+import { SectionsPanel, type SectionsPanelView } from "./rules/SectionsPanel";
+import { useLocalRules } from "./rules/useLocalRules";
 import { useRulesState } from "./rules/useRulesState";
 
 /** One sub-section block (same pattern as the Operations chapter). */
@@ -53,7 +54,7 @@ function appliedFilters(q: RuleQuery): { key: string; label: string; patch: Part
   if (q.flag) out.push({ key: "flag", label: "Needs confirmation", patch: { flag: false } });
   if (q.question) out.push({ key: "question", label: `Waits on: ${q.question}`, patch: { question: null } });
   if (q.vs && q.changed) out.push({ key: "changed", label: `Changed since ${formatDate(q.vs)}`, patch: { changed: false } });
-  if (q.edited) out.push({ key: "edited", label: "Edited dates", patch: { edited: false } });
+  if (q.edited) out.push({ key: "edited", label: "Local changes", patch: { edited: false } });
   return out;
 }
 
@@ -71,9 +72,14 @@ export default function Rules() {
   const router = useRouter();
   const section = useActiveSection()?.section;
 
-  // Date edits made in this browser, applied over the published register everywhere below.
-  const edits = useRuleEdits();
-  const rules = React.useMemo(() => applyEdits(ruleRegister, edits.edits), [edits.edits]);
+  // Changes made in this browser (edited, added and deleted rules and sections), applied over the published
+  // register everywhere below.
+  const localApi = useLocalRules();
+  const rules = React.useMemo(() => applyLocal(ruleRegister, localApi.local), [localApi.local]);
+
+  // Side panels: a rule (URL ?rule=), the "Add rule" form, or the sections manager. One at a time.
+  const [creating, setCreating] = React.useState(false);
+  const [manage, setManage] = React.useState<SectionsPanelView | null>(null);
 
   // The list, counts and timeline trail typing slightly so the inputs never lag.
   const deferred = React.useDeferredValue(query);
@@ -95,10 +101,26 @@ export default function Rules() {
   const open = React.useCallback(
     (id: string | null) => {
       if (id && !openIdRef.current) opener.current = document.activeElement as HTMLElement | null;
+      if (id) {
+        setCreating(false);
+        setManage(null);
+      }
       openRule(id);
     },
     [openRule]
   );
+  const startCreate = () => {
+    opener.current = document.activeElement as HTMLElement | null;
+    openRule(null);
+    setManage(null);
+    setCreating(true);
+  };
+  const startManage = (v: SectionsPanelView) => {
+    opener.current = document.activeElement as HTMLElement | null;
+    openRule(null);
+    setCreating(false);
+    setManage(v);
+  };
 
   useSearchOpen("rule", React.useCallback((id: string) => open(id), [open]));
 
@@ -162,7 +184,7 @@ export default function Rules() {
 
       <Section id="coverage">
         <Block id="rules-coverage">
-          <RulesCoverage query={query} onSelect={(ctx, sections) => preset({ ctx: [ctx], sec: sections })} />
+          <RulesCoverage rules={rules} query={query} onSelect={(ctx, sections) => preset({ ctx: [ctx], sec: sections })} />
         </Block>
       </Section>
 
@@ -177,8 +199,16 @@ export default function Rules() {
               today={today}
               list={list}
               searchRef={searchRef}
-              editCount={edits.count}
-              onDiscardEdits={edits.resetAll}
+              local={localApi.local}
+              changedCount={localApi.changedRules}
+              localCount={localApi.count}
+              deletedCount={localApi.deletedCount + localApi.local.sections.deleted.length}
+              onAddRule={startCreate}
+              onManage={startManage}
+              onDiscardAll={() => {
+                localApi.resetAll();
+                searchRef.current?.focus();
+              }}
             />
             {deferred.vs && <RulesChanges rules={forSummary} vs={deferred.vs} asOf={asOf} onOpenRule={open} />}
             {list.length === 0 ? (
@@ -227,28 +257,50 @@ export default function Rules() {
 
       <Section id="questions">
         <Block id="rules-questions">
-          <RuleQuestions onOpenRule={open} onFilter={(id) => preset({ question: id })} />
+          <RuleQuestions rules={rules} onOpenRule={open} onFilter={(id) => preset({ question: id })} />
         </Block>
       </Section>
 
       <RulePanel
         rule={current}
+        creating={creating}
+        rules={rules}
+        today={today}
+        api={localApi}
+        onCreated={(id) => {
+          setCreating(false);
+          openRule(id);
+        }}
         asOf={asOf}
         vs={deferred.vs}
         index={index}
         total={list.length}
-        onClose={() => openRule(null)}
+        onClose={() => {
+          setCreating(false);
+          openRule(null);
+        }}
         onPrev={canStep ? () => step(-1) : undefined}
         onNext={canStep ? () => step(1) : undefined}
         onOpenRule={open}
-        onSaveHistory={edits.save}
-        onResetHistory={edits.reset}
         onCloseAutoFocus={(e) => {
           e.preventDefault();
           // Prefer the row of the rule just viewed (after stepping), else whatever opened the panel.
           const id = lastViewed.current;
           const row = id ? document.querySelector<HTMLElement>(`[data-rule-open="${CSS.escape(id)}"]`) : null;
           (row ?? opener.current)?.focus();
+          opener.current = null;
+        }}
+      />
+      <SectionsPanel
+        open={manage !== null}
+        view={manage ?? "sections"}
+        onViewChange={setManage}
+        onClose={() => setManage(null)}
+        rules={rules}
+        api={localApi}
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          opener.current?.focus();
           opener.current = null;
         }}
       />
