@@ -6,6 +6,7 @@ import { GateForm } from "./GateForm";
 import { Globe } from "@/components/chapters/intro/Globe";
 import { getLandMask } from "@/components/chapters/intro/landMask";
 import { TalenciaMark } from "@/components/journey/TalenciaMark";
+import { ThemeSwitch } from "@/components/journey/ThemeToggle";
 
 export const metadata: Metadata = { title: "Welcome" };
 
@@ -31,7 +32,10 @@ export default async function GatePage({ searchParams }: { searchParams: Promise
           </span>
           <span className="t-mono-sm whitespace-nowrap text-muted">for Rossell Techsys</span>
         </div>
-        <span className="hidden pt-2 t-mono-sm text-muted sm:inline">Confidential · Nov 2026</span>
+        <div className="flex flex-col items-end gap-4">
+          <ThemeSwitch />
+          <span className="hidden t-mono-sm text-muted sm:inline">Confidential · Nov 2026</span>
+        </div>
       </header>
       <section className="relative flex flex-1 flex-col justify-center px-6 py-16 sm:px-12 lg:px-16">
         <div className="max-w-5xl">

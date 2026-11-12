@@ -4,6 +4,7 @@
 // Three.js dot-matrix globe. Loaded only through Globe.tsx (next/dynamic, ssr:false).
 import * as React from "react";
 import * as THREE from "three";
+import { useTheme } from "@/lib/theme";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ARC_TARGETS, BENGALURU, GLOBE_POINTS, decodeMask, fibonacciLatLng, latLngToXYZ } from "./geo";
 
@@ -116,6 +117,7 @@ function GlobeScene({ mask, settle, progress, dim, surface = "background" }: Omi
   const start = React.useRef<number | null>(null);
   const { camera, gl } = useThree();
 
+  const theme = useTheme();
   const colors = React.useMemo(
     () => ({
       dot: tokenColor("text-chart-past"),
@@ -123,7 +125,9 @@ function GlobeScene({ mask, settle, progress, dim, surface = "background" }: Omi
       white: tokenColor("text-primary"),
       bg: tokenColor(surface === "canvas" ? "text-canvas" : "text-background"),
     }),
-    [surface]
+    // theme: re-probe token colours when the light/dark theme flips.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [surface, theme]
   );
 
   const dots = React.useMemo(() => {

@@ -443,7 +443,7 @@ export default function Clients() {
         <div id="clients-matrix" className="scroll-mt-24">
           <ChartFrame
             title="Clients and services"
-            subtitle="Rows are clients, columns are services; a white dot is publicly confirmed, a hollow dot is our reading where the scope is not public."
+            subtitle="Rows are clients, columns are services; a solid dot is publicly confirmed, a hollow dot is our reading where the scope is not public."
             footer={
               <>
                 <Legend

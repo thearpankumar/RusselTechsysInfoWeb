@@ -221,7 +221,7 @@ export function StyleguideClient() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ChartFrame
             title="Revenue"
-            subtitle="Each bar is one financial year; the white bar is the latest."
+            subtitle="Each bar is one financial year; the highlighted bar is the latest."
             footer={
               <>
                 <Legend items={[{ label: "Past", tone: "past" }, { label: "Current", tone: "primary" }]} />
@@ -265,7 +265,7 @@ export function StyleguideClient() {
             />
           </ChartFrame>
         </div>
-        <ChartFrame className="mt-6" title="Status track" subtitle="The white dot is where we are today.">
+        <ChartFrame className="mt-6" title="Status track" subtitle="The highlighted dot is where we are today.">
           <StatusTrack
             current={2}
             steps={[

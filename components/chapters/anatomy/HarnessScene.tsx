@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Edges, OrbitControls } from "@react-three/drei";
 import { harnessParts, type HarnessPartId } from "@/content/materials";
+import { useTheme } from "@/lib/theme";
 
 /* ---------- theme tokens, read at runtime (no hex in components) ---------- */
 
@@ -22,9 +23,11 @@ const PROBE_CLASS: Record<Token, string> = {
   background: "bg-background",
 };
 
-function readTokens(): Record<Token, THREE.Color> {
+type Tokens = Record<Token, THREE.Color> & { glow: THREE.Color; glowHi: THREE.Color };
+
+function readTokens(light: boolean): Tokens {
   const root = getComputedStyle(document.documentElement);
-  const out = {} as Record<Token, THREE.Color>;
+  const out = {} as Tokens;
   for (const t of Object.keys(PROBE_CLASS) as Token[]) {
     let v = root.getPropertyValue(`--color-${t}`).trim();
     if (!v) {
@@ -43,6 +46,9 @@ function readTokens(): Record<Token, THREE.Color> {
     }
     out[t] = c;
   }
+  // Emissive tint: a faint self-light from the canvas tone on dark; none on light (a near-white glow washes parts out).
+  out.glow = light ? new THREE.Color(0, 0, 0) : out.canvas;
+  out.glowHi = light ? new THREE.Color(0, 0, 0) : out["chart-past"];
   return out;
 }
 
@@ -310,7 +316,7 @@ function Part({
   id: HarnessPartId;
   order: number;
   instances: Instance[];
-  tokens: Record<Token, THREE.Color>;
+  tokens: Tokens;
   progressRef: React.RefObject<number>;
   highlight: boolean;
   anyHighlight: boolean;
@@ -348,7 +354,7 @@ function Part({
     const target = highlight ? tokens.primary : tokens[BASE_TONE[id]];
     const k = Math.min(1, dt * 10);
     mat.color.lerp(target, k);
-    mat.emissive.lerp(highlight ? tokens["chart-past"] : tokens.canvas, k);
+    mat.emissive.lerp(highlight ? tokens.glowHi : tokens.glow, k);
     mat.opacity += ((anyHighlight && !highlight ? 0.22 : 1) - mat.opacity) * k;
   });
 
@@ -472,7 +478,8 @@ export interface HarnessSceneProps {
 }
 
 export default function HarnessScene({ progressRef, activeId, step, hoveredId, onHover, onSelect, paused, orbit }: HarnessSceneProps) {
-  const tokens = React.useMemo(() => readTokens(), []);
+  const theme = useTheme();
+  const tokens = React.useMemo(() => readTokens(theme === "light"), [theme]);
   const instances = React.useMemo(() => buildInstances(tokens.canvas), [tokens]);
   const focus = hoveredId ?? activeId;
   const anchors: HarnessSceneAnchors = React.useRef({});

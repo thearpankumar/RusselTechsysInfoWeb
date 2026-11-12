@@ -319,7 +319,7 @@ Warm (slightly yellow/brown) near-black, not blue-grey. Never pure `#000` or `#F
 
 **Status uses shape/fill, not hue:** solid white = active/high, grey = dormant/medium, dim = low, hatched = at risk, hollow outline = ended/churned. Always pair the marker with a text label.
 
-**Theme:** Dark is the primary theme. [CONFIRM: is there a light theme? Until its tokens are supplied, do not invent light-mode colours.]
+**Theme:** Dark is the primary theme and the default. A light theme exists as an opt-in (rail toggle, persisted per browser); its tokens live in the `[data-theme="light"]` block of `app/theme.css` and keep the same roles: warm off-white surfaces (never `#FFF`), warm near-black emphasis, a chart ramp from light grey to near-black, and a darkened data palette. In copy, say "highlighted", not "white", for the emphasis colour.
 
 ## Typography
 
